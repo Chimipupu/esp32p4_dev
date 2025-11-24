@@ -1,5 +1,5 @@
 /**
- * @file js-esp32p4-m3-dev.ino
+ * @file esp32p4_dev.ino
  * @author Chimipupu(https://github.com/Chimipupu)
  * @brief ArduinoIDE用ファイル
  * @version 0.1
@@ -15,7 +15,7 @@ void setup(void)
 {
     // H/W初期化
     Serial.begin(115200);
-    delay(1000);
+    delay(100);
 
     // アプリメイン初期化
     app_main_init();
@@ -25,4 +25,6 @@ void loop(void)
 {
     // アプリメイン
     app_main();
+
+    delay(1000);
 }

@@ -11,10 +11,15 @@
 
 #include "common.h"
 #include "app_main.h"
+#include "pcb_def.h"
 
 // ---------------------------------------------------
 // [グローバル変数]
+#if defined(JS_ESP32P4_M3_DEV)
 const char *p_pcb_name_str = "JS-ESP32P4-M3-DEV";
+#elif defined(WT9932P4_TINY)
+const char *p_pcb_name_str = "WT9932P4-Tiny";
+#endif
 
 uint32_t g_cpu_freq_MHz = 0;
 uint32_t g_psram_size = 0;
@@ -24,9 +29,38 @@ uint32_t g_psram_size = 0;
 
 // ---------------------------------------------------
 // [プロトタイプ宣言]
+static void pcd_test(void);
 
 // ---------------------------------------------------
 // [関数]
+
+static void pcd_test(void)
+{
+    // [基板名]
+    // (例)　PCB: JS-ESP32P4-M3-DEV
+    Serial.printf("PCB: %s\n", p_pcb_name_str);
+
+    // [ESPIDFのバージョン取得]
+    // (例)　ESP-IDF Version: v5.5.1-710-g8410210c9a
+    Serial.printf("ESP-IDF Version: %s\n", esp_get_idf_version());
+
+    // [CPUのクロック周波数取得]
+    // (例)　CPU Clock: 360 MHz
+    g_cpu_freq_MHz = getCpuFrequencyMhz();
+    Serial.printf("CPU Clock: %lu MHz\n", g_cpu_freq_MHz);
+
+    // [PSRAMのサイズ取得]
+    // (例)　PSRAM Size: 32 MB
+    g_psram_size = ESP.getPsramSize();
+    if (g_psram_size > 0) {
+        Serial.printf("PSRAM Size: %lu MB\n", g_psram_size / (1024 * 1024));
+    } else {
+        Serial.printf("PSRAM: Not available\n");
+    }
+
+    // [メモリダンプのテスト]
+    show_mem_dump((uint32_t)p_pcb_name_str, strlen(p_pcb_name_str));
+}
 
 /**
  * @brief メモリダンプ(16進HEX & Ascii)
@@ -92,30 +126,7 @@ void show_mem_dump(uint32_t dump_addr, uint32_t dump_size)
  */
 void app_main_init(void)
 {
-    // [基板名]
-    // (例)　PCB: JS-ESP32P4-M3-DEV
-    Serial.printf("PCB: %s\n", p_pcb_name_str);
-
-    // [ESPIDFのバージョン取得]
-    // (例)　ESP-IDF Version: v5.5.1-710-g8410210c9a
-    Serial.printf("ESP-IDF Version: %s\n", esp_get_idf_version());
-
-    // [CPUのクロック周波数取得]
-    // (例)　CPU Clock: 360 MHz
-    g_cpu_freq_MHz = getCpuFrequencyMhz();
-    Serial.printf("CPU Clock: %lu MHz\n", g_cpu_freq_MHz);
-
-    // [PSRAMのサイズ取得]
-    // (例)　PSRAM Size: 32 MB
-    g_psram_size = ESP.getPsramSize();
-    if (g_psram_size > 0) {
-        Serial.printf("PSRAM Size: %lu MB\n", g_psram_size / (1024 * 1024));
-    } else {
-        Serial.printf("PSRAM: Not available\n");
-    }
-
-    // [メモリダンプのテスト]
-    show_mem_dump((uint32_t)p_pcb_name_str, strlen(p_pcb_name_str));
+    // TODO:
 }
 
 /**
@@ -124,5 +135,6 @@ void app_main_init(void)
  */
 void app_main(void)
 {
-    // TODO:
+    // [基板テスト]
+    pcd_test();
 }

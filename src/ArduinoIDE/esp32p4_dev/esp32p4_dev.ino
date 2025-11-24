@@ -25,6 +25,4 @@ void loop(void)
 {
     // アプリメイン
     app_main();
-
-    delay(1000);
 }

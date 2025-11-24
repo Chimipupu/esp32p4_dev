@@ -26,6 +26,7 @@ uint32_t g_psram_size = 0;
 
 // ---------------------------------------------------
 // [Static変数]
+static xTaskHandle s_xTaskDebug;
 static xTaskHandle s_xTaskCore0;
 static xTaskHandle s_xTaskCore1;
 // ---------------------------------------------------
@@ -35,21 +36,41 @@ static void pcd_test(void);
 // ---------------------------------------------------
 // [関数]
 
+static void vTaskDebug(void *p_param)
+{
+    while (1)
+    {
+        Serial.printf("\n[Core %d] DebugTask\n", xPortGetCoreID());
+        pcd_test();
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
+    }
+}
+
 static void vTaskCore0(void *p_param)
 {
     while (1)
     {
-        Serial.printf("CPU Core 0 Task\n");
-        vTaskDelay(1200 / portTICK_PERIOD_MS);
+        Serial.printf("\n[Core %d] MainTask\n", xPortGetCoreID());
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
 static void vTaskCore1(void *p_param)
 {
+
+    xTaskCreatePinnedToCore(vTaskDebug,        // コールバック関数ポインタ
+                            "vTaskDebug",      // タスク名
+                            4096,              // スタック
+                            NULL,              // パラメータ
+                            3,                 // 優先度(0～7、7が最優先)
+                            &s_xTaskDebug,     // ハンドル
+                            APP_PROC_CORE      // CPUのコア選択
+                            );
+
     while (1)
     {
-        Serial.printf("CPU Core 1 Task\n");
-        vTaskDelay(1500 / portTICK_PERIOD_MS);
+        Serial.printf("\n[Core %d] MainTask\n", xPortGetCoreID());
+        vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 }
 
@@ -58,7 +79,7 @@ static void rtos_init(void)
     // [RTOSタスク @CPU Core 0]
     xTaskCreatePinnedToCore(vTaskCore0,        // コールバック関数ポインタ
                             "vTaskCore0",      // タスク名
-                            4096,              // スタック
+                            2048,              // スタック
                             NULL,              // パラメータ
                             7,                 // 優先度(0～7、7が最優先)
                             &s_xTaskCore0,     // ハンドル
@@ -68,7 +89,7 @@ static void rtos_init(void)
     // [RTOSタスク @CPU Core 1]
     xTaskCreatePinnedToCore(vTaskCore1,        // コールバック関数ポインタ
                             "vTaskCore1",      // タスク名
-                            4096,              // スタック
+                            2048,              // スタック
                             NULL,              // パラメータ
                             5,                 // 優先度(0～7、7が最優先)
                             &s_xTaskCore1,     // ハンドル

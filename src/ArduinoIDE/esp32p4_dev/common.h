@@ -16,8 +16,9 @@
 
 // C Std Lib
 #include <stdio.h>
-#include <string.h>
+#include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 // ESP-IDF
 #include <esp_system.h>
@@ -25,15 +26,17 @@
 // ArduinoIDE
 #include <Arduino.h>
 
+// FreeRTOS
+#include <FreeRTOS.h>
+#include <task.h>
+#include <semphr.h>
+
 // My Src Inc
 
 // ---------------------------------------------------
 // [Define]
-// #define CPU_CORE_0_INIT    setup
-// #define CPU_CORE_1_INIT    setup1
-// #define CPU_CORE_0_MAIN    loop
-// #define CPU_CORE_1_MAIN    loop1
-
+#define DRV_CPU_CORE     0 // ドライバ専用CPU @Core 0
+#define APP_PROC_CORE    1 // アプリ専用CPU @Core 1
 // ---------------------------------------------------
 // [コンパイルスイッチ]
 

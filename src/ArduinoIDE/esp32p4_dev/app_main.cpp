@@ -26,13 +26,55 @@ uint32_t g_psram_size = 0;
 
 // ---------------------------------------------------
 // [Static変数]
-
+static xTaskHandle s_xTaskCore0;
+static xTaskHandle s_xTaskCore1;
 // ---------------------------------------------------
 // [プロトタイプ宣言]
+static void rtos_init(void);
 static void pcd_test(void);
-
 // ---------------------------------------------------
 // [関数]
+
+static void vTaskCore0(void *p_param)
+{
+    while (1)
+    {
+        Serial.printf("CPU Core 0 Task\n");
+        vTaskDelay(1200 / portTICK_PERIOD_MS);
+    }
+}
+
+static void vTaskCore1(void *p_param)
+{
+    while (1)
+    {
+        Serial.printf("CPU Core 1 Task\n");
+        vTaskDelay(1500 / portTICK_PERIOD_MS);
+    }
+}
+
+static void rtos_init(void)
+{
+    // [RTOSタスク @CPU Core 0]
+    xTaskCreatePinnedToCore(vTaskCore0,        // コールバック関数ポインタ
+                            "vTaskCore0",      // タスク名
+                            4096,              // スタック
+                            NULL,              // パラメータ
+                            7,                 // 優先度(0～7、7が最優先)
+                            &s_xTaskCore0,     // ハンドル
+                            DRV_CPU_CORE       // CPUのコア選択
+                            );
+
+    // [RTOSタスク @CPU Core 1]
+    xTaskCreatePinnedToCore(vTaskCore1,        // コールバック関数ポインタ
+                            "vTaskCore1",      // タスク名
+                            4096,              // スタック
+                            NULL,              // パラメータ
+                            5,                 // 優先度(0～7、7が最優先)
+                            &s_xTaskCore1,     // ハンドル
+                            APP_PROC_CORE      // CPUのコア選択
+                            );
+}
 
 static void pcd_test(void)
 {
@@ -60,6 +102,8 @@ static void pcd_test(void)
 
     // [メモリダンプのテスト]
     show_mem_dump((uint32_t)p_pcb_name_str, strlen(p_pcb_name_str));
+
+    Serial.printf("\n");
 }
 
 /**
@@ -126,7 +170,7 @@ void show_mem_dump(uint32_t dump_addr, uint32_t dump_size)
  */
 void app_main_init(void)
 {
-    // TODO:
+    rtos_init();
 }
 
 /**
@@ -135,6 +179,7 @@ void app_main_init(void)
  */
 void app_main(void)
 {
-    // [基板テスト]
-    pcd_test();
+    // NOTE: loopタスクはいらない
+    Serial.printf("loop Task is Suspend !!!\n");
+    vTaskSuspend(NULL);
 }

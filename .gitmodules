@@ -1,0 +1,3 @@
+[submodule "doc/コーディング規約/c_lang_coding_conventions_for_chimipupu"]
+	path = doc/コーディング規約/c_lang_coding_conventions_for_chimipupu
+	url = https://github.com/Chimipupu/c_lang_coding_conventions_for_chimipupu.git

@@ -3,78 +3,142 @@
  * @author Chimipupu(https://github.com/Chimipupu)
  * @brief アプリメイン
  * @version 0.1
- * @date 2025-11-20
- * 
+ * @date 2026-03-28
  * @copyright Copyright (c) 2025 Chimipupu All Rights Reserved.
- * 
  */
 
-#include "common.h"
 #include "app_main.h"
+#include "common.h"
 #include "pcb_def.h"
 
 // ---------------------------------------------------
-// [グローバル変数]
-#if defined(JS_ESP32P4_M3_DEV)
+// [DEBUG関連]
+#ifdef DEBUG_APP
+static void _dbg_pcb_info_print(void);
+#endif // DEBUG_APP
+
+// ---------------------------------------------------
+// [グローバル]
+#if (PCB_TYPE == JS_ESP32P4_M3_DEV)
 const char *p_pcb_name_str = "JS-ESP32P4-M3-DEV";
-#elif defined(WT9932P4_TINY)
+#elif (PCB_TYPE == WT9932P4_TINY)
 const char *p_pcb_name_str = "WT9932P4-Tiny";
 #endif
 
+const char *p_chip_model_str = NULL;
+uint16_t g_chip_rev = 0;
 uint32_t g_cpu_freq_MHz = 0;
-uint32_t g_psram_size = 0;
-
+uint8_t g_cpu_core_num = 0;
+uint8_t g_flash_size_mega_byte = 0;
+uint8_t g_psram_size_mega_byte = 0;
+const char *p_esp_idf_ver_str = NULL;
 // ---------------------------------------------------
-// [Static変数]
-static xTaskHandle s_xTaskDebug;
+// [Static]
+
+// FreeRTOS関連
 static xTaskHandle s_xTaskCore0;
 static xTaskHandle s_xTaskCore1;
-// ---------------------------------------------------
-// [プロトタイプ宣言]
-static void rtos_init(void);
-static void pcd_test(void);
-// ---------------------------------------------------
-// [関数]
+#ifdef DEBUG_TASK
+static xTaskHandle s_xTaskDebug;
+static void vTaskDebug(void *p_param);
+#endif // DEBUG_TASK
+static void vTaskCore0(void *p_param);
+static void vTaskCore1(void *p_param);
 
-static void vTaskDebug(void *p_param)
+static void _freertos_init(void);
+static void _mcu_init(void);
+static void _pcb_init(void);
+// ---------------------------------------------------
+// [Static関数]
+
+static void _mcu_init(void)
 {
-    while (1)
-    {
-        Serial.printf("\n[Core %d] DebugTask\n", xPortGetCoreID());
-        pcd_test();
-        vTaskDelay(3000 / portTICK_PERIOD_MS);
+    uint32_t tmp_u32;
+
+    // ESP32のチップの種類とリビジョンを取得
+    p_chip_model_str = ESP.getChipModel();
+    g_chip_rev = ESP.getChipRevision();
+
+    // CPUのクロック周波数とコア数を取得
+    g_cpu_freq_MHz = getCpuFrequencyMhz();
+    g_cpu_core_num = ESP.getChipCores();
+
+    // Flashのサイズを取得
+    tmp_u32 = ESP.getFlashChipSize();
+    g_flash_size_mega_byte = (uint8_t)(tmp_u32 / (1024 * 1024));
+
+    // PSRAMのサイズを取得
+    tmp_u32 = ESP.getPsramSize();
+    g_psram_size_mega_byte = (uint8_t)(tmp_u32 / (1024 * 1024));
+
+    // ESPIDFのバージョン取得
+    p_esp_idf_ver_str = esp_get_idf_version();
+}
+
+#ifdef DEBUG_APP
+static void _dbg_pcb_info_print(void)
+{
+    Serial.printf("PCB: %s\n", p_pcb_name_str);
+    Serial.printf("ESP-IDF Version: %s\n", p_esp_idf_ver_str);
+    Serial.printf("ESP32 Chip Model: %s\n", p_chip_model_str);
+    Serial.printf("ESP32 Chip Rev: %d\n", g_chip_rev);
+    Serial.printf("CPU Clock: %lu MHz\n", g_cpu_freq_MHz);
+    Serial.printf("CPU Core Num: %d Core CPU\n", g_cpu_core_num);
+    Serial.printf("Flash Size: %d MB\n", g_flash_size_mega_byte);
+    if (g_psram_size_mega_byte > 0) {
+        Serial.printf("PSRAM Size: %d MB\n", g_psram_size_mega_byte);
+    } else {
+        Serial.printf("PSRAM: Not available\n");
     }
+}
+#endif // DEBUG_APP
+
+static void _pcb_init(void)
+{
+#ifdef DEBUG_APP
+    _dbg_pcb_info_print();
+#endif
 }
 
 static void vTaskCore0(void *p_param)
 {
+    // static uint8_t s_cpu_core_num  = xPortGetCoreID();
+
     while (1)
     {
-        Serial.printf("\n[Core %d] MainTask\n", xPortGetCoreID());
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        Serial.printf("[Drv CPU] CPU 0 MainTask (for Drv Proc)\n");
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
 
 static void vTaskCore1(void *p_param)
 {
-
-    xTaskCreatePinnedToCore(vTaskDebug,        // コールバック関数ポインタ
-                            "vTaskDebug",      // タスク名
-                            4096,              // スタック
-                            NULL,              // パラメータ
-                            3,                 // 優先度(0～7、7が最優先)
-                            &s_xTaskDebug,     // ハンドル
-                            APP_PROC_CORE      // CPUのコア選択
-                            );
+    // static uint8_t s_cpu_core_num  = xPortGetCoreID();
 
     while (1)
     {
-        Serial.printf("\n[Core %d] MainTask\n", xPortGetCoreID());
-        vTaskDelay(200 / portTICK_PERIOD_MS);
+        Serial.printf("[App CPU] CPU 1 MainTask (for App Proc)\n");
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
 }
 
-static void rtos_init(void)
+#ifdef DEBUG_TASK
+static void vTaskDebug(void *p_param)
+{
+    static uint8_t s_cpu_core_num  = xPortGetCoreID();
+
+    while (1)
+    {
+        Serial.printf("[CPU Core %d] DebugTask  (for DEBUG App Proc)\n", s_cpu_core_num);
+#ifdef DEBUG_APP
+        _dbg_pcb_info_print();
+#endif
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    }
+}
+#endif // DEBUG_TASK
+
+static void _freertos_init(void)
 {
     // [RTOSタスク @CPU Core 0]
     xTaskCreatePinnedToCore(vTaskCore0,        // コールバック関数ポインタ
@@ -95,108 +159,34 @@ static void rtos_init(void)
                             &s_xTaskCore1,     // ハンドル
                             APP_PROC_CORE      // CPUのコア選択
                             );
+
+#ifdef DEBUG_TASK
+    xTaskCreatePinnedToCore(vTaskDebug,        // コールバック関数ポインタ
+                            "vTaskDebug",      // タスク名
+                            4096,              // スタック
+                            NULL,              // パラメータ
+                            3,                 // 優先度(0～7、7が最優先)
+                            &s_xTaskDebug,     // ハンドル
+                            APP_PROC_CORE      // CPUのコア選択
+                            );
+#endif // DEBUG_TASK
 }
 
-static void pcd_test(void)
-{
-    // [基板名]
-    // (例)　PCB: JS-ESP32P4-M3-DEV
-    Serial.printf("PCB: %s\n", p_pcb_name_str);
-
-    // [ESPIDFのバージョン取得]
-    // (例)　ESP-IDF Version: v5.5.1-710-g8410210c9a
-    Serial.printf("ESP-IDF Version: %s\n", esp_get_idf_version());
-
-    // [CPUのクロック周波数取得]
-    // (例)　CPU Clock: 360 MHz
-    g_cpu_freq_MHz = getCpuFrequencyMhz();
-    Serial.printf("CPU Clock: %lu MHz\n", g_cpu_freq_MHz);
-
-    // [PSRAMのサイズ取得]
-    // (例)　PSRAM Size: 32 MB
-    g_psram_size = ESP.getPsramSize();
-    if (g_psram_size > 0) {
-        Serial.printf("PSRAM Size: %lu MB\n", g_psram_size / (1024 * 1024));
-    } else {
-        Serial.printf("PSRAM: Not available\n");
-    }
-
-    // [メモリダンプのテスト]
-    show_mem_dump((uint32_t)p_pcb_name_str, strlen(p_pcb_name_str));
-
-    Serial.printf("\n");
-}
-
-/**
- * @brief メモリダンプ(16進HEX & Ascii)
- * 
- * @param dump_addr ダンプするメモリの32bitアドレス
- * @param dump_size ダンプするサイズ(Byte)
- */
-void show_mem_dump(uint32_t dump_addr, uint32_t dump_size)
-{
-    Serial.printf("\n[Memory Dump '(addr:0x%04lX)]\n", dump_addr);
-
-    // ヘッダー行を表示
-    Serial.printf("Address  ");
-    for (int i = 0; i < 16; i++)
-    {
-        Serial.printf(" %X ", i);
-    }
-
-    Serial.printf("| ASCII\n");
-    Serial.printf("-------- ");
-
-    for (int i = 0; i < 16; i++)
-    {
-        Serial.printf("---");
-    }
-    Serial.printf("| ------\n");
-
-    // 16バイトずつダンプ
-    for (uint32_t offset = 0; offset < dump_size; offset += 16)
-    {
-        Serial.printf("%08lX: ", dump_addr + offset);
-
-        // 16バイト分のデータを表示
-        for (int i = 0; i < 16; i++)
-        {
-            if (offset + i < dump_size) {
-                uint8_t data = *((volatile uint8_t*)(dump_addr + offset + i));
-                Serial.printf("%02X ", data);
-            } else {
-                Serial.printf("   ");
-            }
-        }
-
-        // ASCII表示
-        Serial.printf("| ");
-        for (int i = 0; i < 16; i++)
-        {
-            if (offset + i < dump_size) {
-                uint8_t data = *((volatile uint8_t*)(dump_addr + offset + i));
-                // 表示可能なASCII文字のみ表示
-                Serial.printf("%c", (data >= 32 && data <= 126) ? data : '.');
-            } else {
-                Serial.printf(" ");  // データがない場合は空白を表示
-            }
-        }
-        Serial.printf("\n");
-    }
-}
+// ---------------------------------------------------
+// [API]
 
 /**
  * @brief アプリメイン初期化
- * 
  */
 void app_main_init(void)
 {
-    rtos_init();
+    _mcu_init();      // マイコン初期化
+    _pcb_init();      // 基板初期化
+    _freertos_init(); // FreeRTOS 初期化
 }
 
 /**
  * @brief アプリメイン
- * 
  */
 void app_main(void)
 {

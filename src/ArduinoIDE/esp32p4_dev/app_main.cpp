@@ -26,7 +26,7 @@ const char *p_pcb_name_str = "WT9932P4-Tiny";
 #endif
 
 const char *p_chip_model_str = NULL;
-uint16_t g_chip_rev = 0;
+float g_chip_rev = 0;
 uint32_t g_cpu_freq_MHz = 0;
 uint8_t g_cpu_core_num = 0;
 uint8_t g_flash_size_mega_byte = 0;
@@ -57,7 +57,8 @@ static void _mcu_init(void)
 
     // ESP32のチップの種類とリビジョンを取得
     p_chip_model_str = ESP.getChipModel();
-    g_chip_rev = ESP.getChipRevision();
+    tmp_u32 = ESP.getChipRevision();
+    g_chip_rev = (float)tmp_u32 / 100.0f;
 
     // CPUのクロック周波数とコア数を取得
     g_cpu_freq_MHz = getCpuFrequencyMhz();
@@ -78,18 +79,20 @@ static void _mcu_init(void)
 #ifdef DEBUG_APP
 static void _dbg_pcb_info_print(void)
 {
+    Serial.printf("-------------------------------\n");
     Serial.printf("PCB: %s\n", p_pcb_name_str);
-    Serial.printf("ESP-IDF Version: %s\n", p_esp_idf_ver_str);
     Serial.printf("ESP32 Chip Model: %s\n", p_chip_model_str);
-    Serial.printf("ESP32 Chip Rev: %d\n", g_chip_rev);
+    Serial.printf("ESP32 Chip Rev: v%.01f\n", g_chip_rev);
     Serial.printf("CPU Clock: %lu MHz\n", g_cpu_freq_MHz);
-    Serial.printf("CPU Core Num: %d Core CPU\n", g_cpu_core_num);
+    Serial.printf("CPU Core: x%d\n", g_cpu_core_num);
     Serial.printf("Flash Size: %d MB\n", g_flash_size_mega_byte);
     if (g_psram_size_mega_byte > 0) {
         Serial.printf("PSRAM Size: %d MB\n", g_psram_size_mega_byte);
     } else {
         Serial.printf("PSRAM: Not available\n");
     }
+    Serial.printf("ESP-IDF Version: %s\n", p_esp_idf_ver_str);
+    Serial.printf("-------------------------------\n");
 }
 #endif // DEBUG_APP
 
@@ -106,7 +109,7 @@ static void vTaskCore0(void *p_param)
 
     while (1)
     {
-        Serial.printf("[Drv CPU] CPU 0 MainTask (for Drv Proc)\n");
+        Serial.printf("[CPU Core %d] vTaskCore0\n", DRV_CPU_CORE);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
@@ -117,7 +120,7 @@ static void vTaskCore1(void *p_param)
 
     while (1)
     {
-        Serial.printf("[App CPU] CPU 1 MainTask (for App Proc)\n");
+        Serial.printf("[CPU Core %d] vTaskCore1\n", APP_PROC_CORE);
         vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
 }
@@ -125,11 +128,11 @@ static void vTaskCore1(void *p_param)
 #ifdef DEBUG_TASK
 static void vTaskDebug(void *p_param)
 {
-    static uint8_t s_cpu_core_num  = xPortGetCoreID();
+    // static uint8_t s_cpu_core_num  = xPortGetCoreID();
 
     while (1)
     {
-        Serial.printf("[CPU Core %d] DebugTask  (for DEBUG App Proc)\n", s_cpu_core_num);
+        Serial.printf("[CPU Core %d] vTaskDebug\n", APP_PROC_CORE);
 #ifdef DEBUG_APP
         _dbg_pcb_info_print();
 #endif

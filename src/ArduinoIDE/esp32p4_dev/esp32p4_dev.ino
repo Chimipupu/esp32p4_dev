@@ -23,6 +23,5 @@ void setup(void)
 
 void loop(void)
 {
-    // アプリメイン
-    app_main();
+    app_main(); // アプリメイン
 }

@@ -27,6 +27,13 @@
 
 #define PCB_TYPE             WT9932P4_TINY
 // #define PCB_TYPE             JS_ESP32P4_M3_DEV
+
+#if (PCB_TYPE == WT9932P4_TINY)
+#define RGBLED_PIN               51  // RGBLED(Neopixel)のデータピンとの接続GPIO: IO51
+#define RGBLED_NUM               1   // RGBLEDの数
+#define RGBLED_MAX_BRIGHTNESS    16  // RGBLEDの最大輝度
+#define RGBLED_COLOR_ON_TIMER    100 // RGBLEDの1色の表示時間
+#endif
 // ---------------------------------------------------
 
 #endif // PCB_DEF_H

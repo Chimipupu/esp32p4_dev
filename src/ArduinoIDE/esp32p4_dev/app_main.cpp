@@ -3,7 +3,7 @@
  * @author Chimipupu(https://github.com/Chimipupu)
  * @brief アプリメイン
  * @version 0.1
- * @date 2026-03-28
+ * @date 2026-08-06
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 
@@ -11,11 +11,12 @@
 #include "common.h"
 #include "pcb_def.h"
 
+#if (PCB_TYPE == WT9932P4_TINY)
+#include "app_neopixel.h"
+#endif
 // ---------------------------------------------------
 // [DEBUG関連]
-#ifdef DEBUG_APP
 static void _dbg_pcb_info_print(void);
-#endif // DEBUG_APP
 
 // ---------------------------------------------------
 // [グローバル]
@@ -55,6 +56,11 @@ static void _mcu_init(void)
 {
     uint32_t tmp_u32;
 
+#if (PCB_TYPE == WT9932P4_TINY)
+    // RGBLED(Neopixel)初期化
+    app_neopixel_init(RGBLED_PIN, RGBLED_NUM, RGBLED_MAX_BRIGHTNESS);
+#endif
+
     // ESP32のチップの種類とリビジョンを取得
     p_chip_model_str = ESP.getChipModel();
     tmp_u32 = ESP.getChipRevision();
@@ -76,7 +82,6 @@ static void _mcu_init(void)
     p_esp_idf_ver_str = esp_get_idf_version();
 }
 
-#ifdef DEBUG_APP
 static void _dbg_pcb_info_print(void)
 {
     Serial.printf("-------------------------------\n");
@@ -94,49 +99,46 @@ static void _dbg_pcb_info_print(void)
     Serial.printf("ESP-IDF Version: %s\n", p_esp_idf_ver_str);
     Serial.printf("-------------------------------\n");
 }
-#endif // DEBUG_APP
 
 static void _pcb_init(void)
 {
-#ifdef DEBUG_APP
     _dbg_pcb_info_print();
-#endif
 }
 
 static void vTaskCore0(void *p_param)
 {
-    // static uint8_t s_cpu_core_num  = xPortGetCoreID();
+    Serial.printf("[CPU Core 0] vTaskCore0\n");
 
     while (1)
     {
-        Serial.printf("[CPU Core %d] vTaskCore0\n", DRV_CPU_CORE);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
 static void vTaskCore1(void *p_param)
 {
-    // static uint8_t s_cpu_core_num  = xPortGetCoreID();
+    Serial.printf("[CPU Core 1] vTaskCore1\n");
 
     while (1)
     {
-        Serial.printf("[CPU Core %d] vTaskCore1\n", APP_PROC_CORE);
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 }
 
 #ifdef DEBUG_TASK
 static void vTaskDebug(void *p_param)
 {
-    // static uint8_t s_cpu_core_num  = xPortGetCoreID();
+    static uint8_t s_cpu_core = xPortGetCoreID();
+
+    Serial.printf("[CPU Core %d] vTaskDebug\n", s_cpu_core);
+    _dbg_pcb_info_print();
 
     while (1)
     {
-        Serial.printf("[CPU Core %d] vTaskDebug\n", APP_PROC_CORE);
-#ifdef DEBUG_APP
-        _dbg_pcb_info_print();
+#if (PCB_TYPE == WT9932P4_TINY)
+        app_neopixel_rgb_illumination(0);
 #endif
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
 #endif // DEBUG_TASK
@@ -164,6 +166,7 @@ static void _freertos_init(void)
                             );
 
 #ifdef DEBUG_TASK
+    // [デバッグ用のタスク @CPU Core 1]
     xTaskCreatePinnedToCore(vTaskDebug,        // コールバック関数ポインタ
                             "vTaskDebug",      // タスク名
                             4096,              // スタック

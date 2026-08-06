@@ -3,8 +3,8 @@
  * @author Chimipupu(https://github.com/Chimipupu)
  * @brief 基板別定義
  * @version 0.1
- * @date 2026-03-28
- * @copyright Copyright (c) 2025 Chimipupu All Rights Reserved.
+ * @date 2026-08-06
+ * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 
 #ifndef PCB_DEF_H
@@ -25,8 +25,8 @@
  */
 #define JS_ESP32P4_M3_DEV    0x01
 
-// #define PCB_TYPE             WT9932P4_TINY
-#define PCB_TYPE             JS_ESP32P4_M3_DEV
+#define PCB_TYPE             WT9932P4_TINY
+// #define PCB_TYPE             JS_ESP32P4_M3_DEV
 // ---------------------------------------------------
 
 #endif // PCB_DEF_H

@@ -4,7 +4,7 @@
  * @brief アプリメイン
  * @version 0.1
  * @date 2026-03-28
- * @copyright Copyright (c) 2025 Chimipupu All Rights Reserved.
+ * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 
 #include "app_main.h"

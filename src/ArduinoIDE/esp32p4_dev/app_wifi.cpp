@@ -35,12 +35,15 @@ static const app_wifi_auth_data_t g_wifi_auth_data_tbl[] = {
 };
 static const uint8_t WIFI_AUTH_DATA_TBL_SIZE = sizeof(g_wifi_auth_data_tbl) / sizeof(g_wifi_auth_data_tbl[0]);
 
+#define WIFI_ERROR_NONE    0
+static wifi_err_reason_t s_wifi_err = (wifi_err_reason_t) WIFI_ERROR_NONE;
 static time_t s_utc_time = 0;
 // static time_t s_jst_time = 0;
 static struct tm *sp_utc_tm = NULL;
 static struct tm *sp_jst_tm = NULL;
-
 static bool s_is_ntp_sync = false;
+
+static void _wifi_event_handler(WiFiEvent_t event, WiFiEventInfo_t info);
 static void _wifi_coprocessor_reset(void);
 static void _wifi_connet(const char *p_ssid, const char *p_password);
 static void _wifi_disconnet(void);
@@ -48,6 +51,27 @@ static bool _get_wifi_auth_mode_data(wifi_auth_mode_t auth_mode);
 static void _get_ntp_and_rtc_time(void);
 // -----------------------------------------------------------
 // [Static]
+
+static void _wifi_event_handler(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+    switch (event) {
+        case ARDUINO_EVENT_WIFI_STA_START:
+            Serial.printf("[WiFi Event] Station Started\r\n");
+            break;
+        case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+            Serial.printf("[WiFi Event] Connected to AP\r\n");
+            break;
+        case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+            Serial.printf("[WiFi Event] Got IP Address\r\n");
+            break;
+        case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+            s_wifi_err = (wifi_err_reason_t) info.wifi_sta_disconnected.reason;
+            Serial.printf("[WiFi Event] Disconnected! Reason: %d\r\n", s_wifi_err);
+            break;
+        default:
+            break;
+    }
+}
 
 /**
  * @brief WiFiコプロセッサ初期化(for ESP32P4 <-> ESP32-C6)
@@ -57,13 +81,16 @@ static void _wifi_coprocessor_reset(void)
     Serial.printf("WiFi Co-Processor Init\r\n");
 
     WiFi.mode(WIFI_STA);
-    WiFi.disconnect();
+    // WiFi.disconnect();
     delay(100);
 }
 
 static void _wifi_connet(const char *p_ssid, const char *p_password)
 {
-    uint8_t retry_count = 0;
+    uint8_t retry_count;
+
+    // WiFiイベントハンドラを登録
+    WiFi.onEvent(_wifi_event_handler);
 
     if((p_ssid == NULL) && (p_password == NULL)) {
         Serial.printf("WiFi STA Mode\r\n");
@@ -74,15 +101,16 @@ static void _wifi_connet(const char *p_ssid, const char *p_password)
         return;
     }
 
-    if((p_ssid != NULL) && (p_password != NULL)) {
-        Serial.printf("SSID: %s\r\n", p_ssid);
-        Serial.printf("Password: %s\r\n", p_password);
-        Serial.printf("WiFi Connect");
+    Serial.printf("SSID: %s\r\n", p_ssid);
+    Serial.printf("Password: %s\r\n", p_password);
+    Serial.printf("WiFi Connectting\r\n");
 
-        _wifi_coprocessor_reset();
+    _wifi_coprocessor_reset();
+    delay(500);  // WiFiコプロセッサのリセット待ち
 
-        WiFi.begin(p_ssid, p_password);
-    }
+WIFI_RETRY:
+    WiFi.begin(p_ssid, p_password);
+    retry_count = 0;
 
 #if 1
     while (WiFi.status() != WL_CONNECTED)
@@ -91,6 +119,15 @@ static void _wifi_connet(const char *p_ssid, const char *p_password)
         Serial.print(".");
         retry_count++;
 
+        // WiFiイベントハンドラで何かしらの切断イベントが発生
+        if(s_wifi_err != WIFI_ERROR_NONE) {
+            // エラーコードだけ表示して、フラグをリセット
+            // NOTE: wifi_err_reason_tの8は「Deassociated due to leaving」で初期化時の仕様で出ることが多いから無視して大丈夫
+            Serial.printf("\r\n[WARN] WiFi disconnected (Reason: %d), Retrying...\r\n", s_wifi_err);
+            s_wifi_err = (wifi_err_reason_t) WIFI_ERROR_NONE;
+            goto WIFI_RETRY;
+        }
+
         // タイムアウト処理
         if (retry_count > 60) {
             Serial.printf("\r\n[ERROR] WiFi Connection Timeout!\r\n");
@@ -98,7 +135,6 @@ static void _wifi_connet(const char *p_ssid, const char *p_password)
         }
     }
 #endif
-
     Serial.printf("\r\nWiFi Connect, Succes!\r\n");
     Serial.printf("RSSI: %d\r\n", WiFi.RSSI());
     Serial.printf("IP Addr: %s\r\n", WiFi.localIP().toString().c_str());

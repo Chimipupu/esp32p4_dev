@@ -1,7 +1,8 @@
 /**
  * @file app_wifi.cpp
  * @author Chimipupu(https://github.com/Chimipupu)
- * @brief WiFiアプリ
+ * @brief WiFiアプリ (for ESP32-P4)
+ * @note ESP32-P4とSDIOで接続されてるESP32-C6専用の実装
  * @version 0.1
  * @date 2026-08-06
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
@@ -35,18 +36,20 @@ static const app_wifi_auth_data_t g_wifi_auth_data_tbl[] = {
 };
 static const uint8_t WIFI_AUTH_DATA_TBL_SIZE = sizeof(g_wifi_auth_data_tbl) / sizeof(g_wifi_auth_data_tbl[0]);
 
-#define WIFI_ERROR_NONE    0
-static wifi_err_reason_t s_wifi_err = (wifi_err_reason_t) WIFI_ERROR_NONE;
+#define WIFI_ERROR_NONE         0
+#define WIFI_ERROR_UNKNOWN      0xFF
+static uint8_t s_wifi_err = WIFI_ERROR_NONE;
 static time_t s_utc_time = 0;
 // static time_t s_jst_time = 0;
 static struct tm *sp_utc_tm = NULL;
 static struct tm *sp_jst_tm = NULL;
 static bool s_is_ntp_sync = false;
+static bool s_is_wifi_connect = false;
 
 static void _wifi_event_handler(WiFiEvent_t event, WiFiEventInfo_t info);
 static void _wifi_coprocessor_reset(void);
 static void _wifi_connet(const char *p_ssid, const char *p_password);
-static void _wifi_disconnet(void);
+// static void _wifi_disconnet(void);
 static bool _get_wifi_auth_mode_data(wifi_auth_mode_t auth_mode);
 static void _get_ntp_and_rtc_time(void);
 // -----------------------------------------------------------
@@ -56,19 +59,27 @@ static void _wifi_event_handler(WiFiEvent_t event, WiFiEventInfo_t info)
 {
     switch (event) {
         case ARDUINO_EVENT_WIFI_STA_START:
-            Serial.printf("[WiFi Event] Station Started\r\n");
+            Serial.printf("\r\n[WiFi Event] WiFi STA: Started\r\n");
             break;
+
         case ARDUINO_EVENT_WIFI_STA_CONNECTED:
-            Serial.printf("[WiFi Event] Connected to AP\r\n");
+            Serial.printf("\r\n[WiFi Event] WiFi STA: Connected to AP\r\n");
+            s_is_wifi_connect = true;
             break;
+
         case ARDUINO_EVENT_WIFI_STA_GOT_IP:
-            Serial.printf("[WiFi Event] Got IP Address\r\n");
+            Serial.printf("\r\n[WiFi Event] WiFi STA: Got IP Address\r\n");
             break;
+
         case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
-            s_wifi_err = (wifi_err_reason_t) info.wifi_sta_disconnected.reason;
-            Serial.printf("[WiFi Event] Disconnected! Reason: %d\r\n", s_wifi_err);
+            s_is_wifi_connect = false;
+            s_wifi_err = info.wifi_sta_disconnected.reason;
+            // Serial.printf("\r\n[WiFi Event] WiFi STA: Disconnected. Reason = %d\r\n", s_wifi_err);
             break;
+
+        // Caseで取ってない知らんイベント
         default:
+            Serial.printf("\r\n[WiFi Event] WiFi STA: My App, Not Support Event\r\n");
             break;
     }
 }
@@ -105,15 +116,15 @@ static void _wifi_connet(const char *p_ssid, const char *p_password)
     Serial.printf("Password: %s\r\n", p_password);
     Serial.printf("WiFi Connectting\r\n");
 
+    // WiFiコプロセッサのリセット
     _wifi_coprocessor_reset();
-    delay(500);  // WiFiコプロセッサのリセット待ち
 
 WIFI_RETRY:
     WiFi.begin(p_ssid, p_password);
     retry_count = 0;
 
 #if 1
-    while (WiFi.status() != WL_CONNECTED)
+    while((WiFi.status() != WL_CONNECTED) || (s_is_wifi_connect == false))
     {
         delay(1000);
         Serial.print(".");
@@ -122,30 +133,42 @@ WIFI_RETRY:
         // WiFiイベントハンドラで何かしらの切断イベントが発生
         if(s_wifi_err != WIFI_ERROR_NONE) {
             // エラーコードだけ表示して、フラグをリセット
-            // NOTE: wifi_err_reason_tの8は「Deassociated due to leaving」で初期化時の仕様で出ることが多いから無視して大丈夫
             Serial.printf("\r\n[WARN] WiFi disconnected (Reason: %d), Retrying...\r\n", s_wifi_err);
-            s_wifi_err = (wifi_err_reason_t) WIFI_ERROR_NONE;
-            goto WIFI_RETRY;
+
+            // NOTE: WIFI_REASON_ASSOC_LEAVE (10進で8) の「Deassociated due to leaving」は無視して大丈夫
+            if(s_wifi_err == WIFI_REASON_ASSOC_LEAVE) {
+                s_wifi_err = WIFI_ERROR_NONE;
+                goto WIFI_RETRY;
+            }
+            // WiFiのエラー発生
+            else {
+                s_wifi_err = WIFI_ERROR_UNKNOWN;
+                return;
+            }
         }
 
-        // タイムアウト処理
+        // タイムアウト
         if (retry_count > 60) {
             Serial.printf("\r\n[ERROR] WiFi Connection Timeout!\r\n");
             return;
         }
     }
 #endif
+
     Serial.printf("\r\nWiFi Connect, Succes!\r\n");
     Serial.printf("RSSI: %d\r\n", WiFi.RSSI());
     Serial.printf("IP Addr: %s\r\n", WiFi.localIP().toString().c_str());
 }
 
+#if 0
 static void _wifi_disconnet(void)
 {
+    s_is_wifi_connect = false;
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
     Serial.printf("WiFi Disconnected!\r\n");
 }
+#endif
 
 static bool _get_wifi_auth_mode_data(wifi_auth_mode_t auth_mode, app_wifi_auth_data_t *p_output_data)
 {
@@ -216,49 +239,6 @@ static void _get_ntp_and_rtc_time(void)
 }
 // -----------------------------------------------------------
 // [API]
-#if 0
-void app_wifi_scan(void)
-{
-    uint8_t i;
-    wifi_auth_mode_t wifi_auth_mode;
-    uint8_t scan_cnt;
-    app_wifi_auth_data_t wifi_auth_data;
-
-    Serial.println("-------------------------------------");
-    Serial.println("[WiFi Scan]");
-    WiFi.setBandMode(WIFI_BAND_MODE_AUTO);
-
-    scan_cnt = WiFi.scanNetworks();
-
-    if (scan_cnt == 0) {
-        Serial.println("WiFi not found");
-    } else {
-        Serial.printf("WiFi Found (%d)\r\n", scan_cnt);
-        Serial.println("No | SSID                             | RSSI | CH | Encryption");
-
-        for (i = 0; i < scan_cnt; ++i)
-        {
-            Serial.printf("%2d", i + 1);
-            Serial.print(" | ");
-            Serial.printf("%-32.32s", WiFi.SSID(i).c_str());
-            Serial.print(" | ");
-            Serial.printf("%4" PRIi32, WiFi.RSSI(i));
-            Serial.print(" | ");
-            Serial.printf("%2" PRIi32, WiFi.channel(i));
-            Serial.print(" | ");
-
-            wifi_auth_mode = WiFi.encryptionType(i);
-            _get_wifi_auth_mode_data(wifi_auth_mode, &wifi_auth_data);
-            Serial.printf("%s\r\n", wifi_auth_data.p_auth_str);
-
-            delay(10);
-        }
-    }
-
-    WiFi.scanDelete();
-    Serial.println("-------------------------------------");
-}
-#endif
 
 void app_wifi_init(const char *p_ssid, const char *p_password)
 {
@@ -267,5 +247,10 @@ void app_wifi_init(const char *p_ssid, const char *p_password)
 
 void app_wifi_main(void)
 {
-    _get_ntp_and_rtc_time();
+    // WiFiエラー発生中は処理しない
+    if(s_wifi_err == WIFI_ERROR_UNKNOWN) {
+        return;
+    }
+
+    _get_ntp_and_rtc_time(); // NTPとの時刻同期
 }

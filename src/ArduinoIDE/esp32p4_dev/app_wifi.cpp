@@ -41,6 +41,7 @@ static struct tm *sp_utc_tm = NULL;
 static struct tm *sp_jst_tm = NULL;
 
 static bool s_is_ntp_sync = false;
+static void _wifi_coprocessor_reset(void);
 static void _wifi_connet(const char *p_ssid, const char *p_password);
 static void _wifi_disconnet(void);
 static bool _get_wifi_auth_mode_data(wifi_auth_mode_t auth_mode);
@@ -48,37 +49,49 @@ static void _get_ntp_and_rtc_time(void);
 // -----------------------------------------------------------
 // [Static]
 
+/**
+ * @brief WiFiコプロセッサ初期化(for ESP32P4 <-> ESP32-C6)
+ */
+static void _wifi_coprocessor_reset(void)
+{
+    Serial.printf("WiFi Co-Processor Init\r\n");
+
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect();
+    delay(100);
+}
+
 static void _wifi_connet(const char *p_ssid, const char *p_password)
 {
-    // WiFi.disconnect()でWiFiのリセット処理
-    {
-        WiFi.disconnect();
-        delay(100);
-    }
+    uint8_t retry_count = 0;
 
     if((p_ssid == NULL) && (p_password == NULL)) {
         Serial.printf("WiFi STA Mode\r\n");
+
+        _wifi_coprocessor_reset();
+
         WiFi.STA.begin();
         return;
     }
 
     if((p_ssid != NULL) && (p_password != NULL)) {
-        Serial.printf("SSID: %s\r\n", MY_WIFI_SSID);
-        Serial.printf("Password: %s\r\n", MY_WIFI_PASSWORD);
+        Serial.printf("SSID: %s\r\n", p_ssid);
+        Serial.printf("Password: %s\r\n", p_password);
         Serial.printf("WiFi Connect");
+
+        _wifi_coprocessor_reset();
+
         WiFi.begin(p_ssid, p_password);
     }
 
 #if 1
-    uint8_t retry_count = 0;
-
     while (WiFi.status() != WL_CONNECTED)
     {
         delay(1000);
         Serial.print(".");
         retry_count++;
 
-        // タイムアウト処理（1分待ってダメなら抜ける）
+        // タイムアウト処理
         if (retry_count > 60) {
             Serial.printf("\r\n[ERROR] WiFi Connection Timeout!\r\n");
             return;

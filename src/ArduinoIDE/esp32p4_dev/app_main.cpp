@@ -17,6 +17,8 @@
 
 #if (PCB_TYPE == JS_ESP32P4_M3_DEV)
 #include "app_wifi.h"
+static const char *g_wifi_ssid = MY_WIFI_SSID;
+static const char *g_wifi_password = MY_WIFI_PASSWORD;
 #endif
 
 // ---------------------------------------------------
@@ -91,7 +93,7 @@ static void _mcu_init(void)
 
 #if (PCB_TYPE == JS_ESP32P4_M3_DEV)
     Serial.printf("[DEBUG] WiFi Init()\n");
-    app_wifi_init(MY_WIFI_SSID, MY_WIFI_PASSWORD);
+    app_wifi_init(g_wifi_ssid, g_wifi_password);
 #endif
 }
 

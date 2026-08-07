@@ -18,8 +18,8 @@
 #include <stdbool.h>
 
 // -----------------------------------------------------------
-// #define MY_WIFI_SSID       "YOUR-WIFI-SSID"     // WiFiのSSID
-// #define MY_WIFI_PASSWORD   "YOUR-WIFI-PASSWORD" // WiFiのパスワード
+#define MY_WIFI_SSID       "B4865595449D-2G" // WiFiのSSID
+#define MY_WIFI_PASSWORD   "55351108940066"  // WiFiのパスワード
 
 #if !defined(MY_WIFI_SSID) || !defined(MY_WIFI_PASSWORD)
 #error "[ERROR] Please define Your Wifi SSID and Password in app_wifi.h"

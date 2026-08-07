@@ -14,6 +14,11 @@
 #if (PCB_TYPE == WT9932P4_TINY)
 #include "app_neopixel.h"
 #endif
+
+#if (PCB_TYPE == JS_ESP32P4_M3_DEV)
+#include "app_wifi.h"
+#endif
+
 // ---------------------------------------------------
 // [DEBUG関連]
 static void _dbg_pcb_info_print(void);
@@ -56,6 +61,9 @@ static void _mcu_init(void)
 {
     uint32_t tmp_u32;
 
+    Serial.begin(115200);
+    delay(100);
+
 #if (PCB_TYPE == WT9932P4_TINY)
     // RGBLED(Neopixel)初期化
     app_neopixel_init(RGBLED_PIN, RGBLED_NUM, RGBLED_MAX_BRIGHTNESS);
@@ -80,6 +88,11 @@ static void _mcu_init(void)
 
     // ESPIDFのバージョン取得
     p_esp_idf_ver_str = esp_get_idf_version();
+
+#if (PCB_TYPE == JS_ESP32P4_M3_DEV)
+    Serial.printf("[DEBUG] WiFi Init()\n");
+    app_wifi_init(MY_WIFI_SSID, MY_WIFI_PASSWORD);
+#endif
 }
 
 static void _dbg_pcb_info_print(void)
@@ -111,7 +124,11 @@ static void vTaskCore0(void *p_param)
 
     while (1)
     {
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+#if (PCB_TYPE == JS_ESP32P4_M3_DEV)
+        // Serial.printf("[CPU Core 1] WiFi main()\n");
+        app_wifi_main();
+#endif
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -121,7 +138,10 @@ static void vTaskCore1(void *p_param)
 
     while (1)
     {
-        vTaskDelay(200 / portTICK_PERIOD_MS);
+#if (PCB_TYPE == WT9932P4_TINY)
+        app_neopixel_rgb_illumination(0);
+#endif
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -131,47 +151,48 @@ static void vTaskDebug(void *p_param)
     static uint8_t s_cpu_core = xPortGetCoreID();
 
     Serial.printf("[CPU Core %d] vTaskDebug\n", s_cpu_core);
-    _dbg_pcb_info_print();
 
     while (1)
     {
-#if (PCB_TYPE == WT9932P4_TINY)
-        app_neopixel_rgb_illumination(0);
-#endif
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        _dbg_pcb_info_print();
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
     }
 }
 #endif // DEBUG_TASK
 
 static void _freertos_init(void)
 {
+#if 1
     // [RTOSタスク @CPU Core 0]
     xTaskCreatePinnedToCore(vTaskCore0,        // コールバック関数ポインタ
                             "vTaskCore0",      // タスク名
-                            2048,              // スタック
+                            16384,              // スタック
                             NULL,              // パラメータ
-                            7,                 // 優先度(0～7、7が最優先)
+                            6,                 // 優先度(0～7、7が最優先)
                             &s_xTaskCore0,     // ハンドル
                             DRV_CPU_CORE       // CPUのコア選択
                             );
+#endif
 
+#if 0
     // [RTOSタスク @CPU Core 1]
     xTaskCreatePinnedToCore(vTaskCore1,        // コールバック関数ポインタ
                             "vTaskCore1",      // タスク名
-                            2048,              // スタック
+                            16384,              // スタック
                             NULL,              // パラメータ
-                            5,                 // 優先度(0～7、7が最優先)
+                            4,                 // 優先度(0～7、7が最優先)
                             &s_xTaskCore1,     // ハンドル
                             APP_PROC_CORE      // CPUのコア選択
                             );
+#endif
 
 #ifdef DEBUG_TASK
     // [デバッグ用のタスク @CPU Core 1]
     xTaskCreatePinnedToCore(vTaskDebug,        // コールバック関数ポインタ
                             "vTaskDebug",      // タスク名
-                            4096,              // スタック
+                            16384,              // スタック
                             NULL,              // パラメータ
-                            3,                 // 優先度(0～7、7が最優先)
+                            1,                 // 優先度(0～7、7が最優先)
                             &s_xTaskDebug,     // ハンドル
                             APP_PROC_CORE      // CPUのコア選択
                             );

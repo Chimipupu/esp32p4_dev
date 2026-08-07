@@ -11,11 +11,6 @@
 
 void setup(void)
 {
-    // H/W初期化
-    Serial.begin(115200);
-    delay(100);
-
-    // アプリメイン初期化
     app_main_init();
 }
 

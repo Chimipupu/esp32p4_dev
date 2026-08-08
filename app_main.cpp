@@ -45,13 +45,14 @@ const char *p_esp_idf_ver_str = NULL;
 
 // FreeRTOS関連
 static xTaskHandle s_xTaskCore0;
-static xTaskHandle s_xTaskCore1;
+// static xTaskHandle s_xTaskCore1;
 #ifdef DEBUG_TASK
 static xTaskHandle s_xTaskDebug;
 static void vTaskDebug(void *p_param);
 #endif // DEBUG_TASK
 static void vTaskCore0(void *p_param);
-static void vTaskCore1(void *p_param);
+
+// static void vTaskCore1(void *p_param);
 
 static void _freertos_init(void);
 static void _mcu_init(void);
@@ -90,11 +91,6 @@ static void _mcu_init(void)
 
     // ESPIDFのバージョン取得
     p_esp_idf_ver_str = esp_get_idf_version();
-
-#if (PCB_TYPE == JS_ESP32P4_M3_DEV)
-    Serial.printf("[DEBUG] WiFi Init()\n");
-    app_wifi_init(g_wifi_ssid, g_wifi_password);
-#endif
 }
 
 static void _dbg_pcb_info_print(void)
@@ -126,14 +122,11 @@ static void vTaskCore0(void *p_param)
 
     while (1)
     {
-#if (PCB_TYPE == JS_ESP32P4_M3_DEV)
-        // Serial.printf("[CPU Core 1] WiFi main()\n");
-        app_wifi_main();
-#endif
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
 
+#if 0
 static void vTaskCore1(void *p_param)
 {
     Serial.printf("[CPU Core 1] vTaskCore1\n");
@@ -146,6 +139,7 @@ static void vTaskCore1(void *p_param)
         vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
 }
+#endif
 
 #ifdef DEBUG_TASK
 static void vTaskDebug(void *p_param)
@@ -168,21 +162,33 @@ static void _freertos_init(void)
     // [RTOSタスク @CPU Core 0]
     xTaskCreatePinnedToCore(vTaskCore0,        // コールバック関数ポインタ
                             "vTaskCore0",      // タスク名
-                            16384,              // スタック
+                            4096,              // スタック
                             NULL,              // パラメータ
-                            6,                 // 優先度(0～7、7が最優先)
+                            3,                 // 優先度(0～7、7が最優先)
                             &s_xTaskCore0,     // ハンドル
                             DRV_CPU_CORE       // CPUのコア選択
                             );
 #endif
 
+#if (PCB_TYPE == JS_ESP32P4_M3_DEV)
+    // [WiFiタスク @CPU Core 0]
+    xTaskCreatePinnedToCore(vTaskWiFi,         // コールバック関数ポインタ
+                            "vTaskWiFi",       // タスク名
+                            8192,              // スタック
+                            NULL,              // パラメータ
+                            6,                 // 優先度(0～7、7が最優先)
+                            &g_xTaskWiFi,      // ハンドル
+                            DRV_CPU_CORE       // CPUのコア選択
+                            );
+#endif // (PCB_TYPE == JS_ESP32P4_M3_DEV)
+
 #if 0
     // [RTOSタスク @CPU Core 1]
     xTaskCreatePinnedToCore(vTaskCore1,        // コールバック関数ポインタ
                             "vTaskCore1",      // タスク名
-                            16384,              // スタック
+                            4096,              // スタック
                             NULL,              // パラメータ
-                            4,                 // 優先度(0～7、7が最優先)
+                            2,                 // 優先度(0～7、7が最優先)
                             &s_xTaskCore1,     // ハンドル
                             APP_PROC_CORE      // CPUのコア選択
                             );
@@ -192,7 +198,7 @@ static void _freertos_init(void)
     // [デバッグ用のタスク @CPU Core 1]
     xTaskCreatePinnedToCore(vTaskDebug,        // コールバック関数ポインタ
                             "vTaskDebug",      // タスク名
-                            16384,              // スタック
+                            4096,              // スタック
                             NULL,              // パラメータ
                             1,                 // 優先度(0～7、7が最優先)
                             &s_xTaskDebug,     // ハンドル

@@ -9,8 +9,15 @@
  */
 
 #include "app_wifi.h"
+#include "common.h"
+#include "pcb_def.h"
 #include "time.h"
 
+#if (PCB_TYPE == JS_ESP32P4_M3_DEV)
+// -----------------------------------------------------------
+// [FreeRTOS関連]
+xTaskHandle g_xTaskWiFi;
+static xTaskHandle s_xTaskWiFiInit;
 // -----------------------------------------------------------
 typedef struct {
     wifi_auth_mode_t auth_mode;
@@ -23,18 +30,8 @@ static const char *gp_ntp_server_tbl[] = {
     "ntp.jst.mfeed.ad.jp",
 };
 
-static const app_wifi_auth_data_t g_wifi_auth_data_tbl[] = {
-    {WIFI_AUTH_OPEN,            "open"},
-    {WIFI_AUTH_WEP,             "WEP"},
-    {WIFI_AUTH_WPA_PSK,         "WPA"},
-    {WIFI_AUTH_WPA2_PSK,        "WPA2"},
-    {WIFI_AUTH_WPA_WPA2_PSK,    "WPA+WPA2"},
-    {WIFI_AUTH_WPA2_ENTERPRISE, "WPA2-EAP"},
-    {WIFI_AUTH_WPA3_PSK,        "WPA3"},
-    {WIFI_AUTH_WPA2_WPA3_PSK,   "WPA2+WPA3"},
-    {WIFI_AUTH_WAPI_PSK,        "WAPI"},
-};
-static const uint8_t WIFI_AUTH_DATA_TBL_SIZE = sizeof(g_wifi_auth_data_tbl) / sizeof(g_wifi_auth_data_tbl[0]);
+static const char *g_wifi_ssid = MY_WIFI_SSID;
+static const char *g_wifi_password = MY_WIFI_PASSWORD;
 
 #define WIFI_ERROR_NONE         0
 #define WIFI_ERROR_UNKNOWN      0xFF
@@ -50,8 +47,9 @@ static void _wifi_event_handler(WiFiEvent_t event, WiFiEventInfo_t info);
 static void _wifi_coprocessor_reset(void);
 static void _wifi_connet(const char *p_ssid, const char *p_password);
 // static void _wifi_disconnet(void);
-static bool _get_wifi_auth_mode_data(wifi_auth_mode_t auth_mode);
-static void _get_ntp_and_rtc_time(void);
+static bool _get_ntp_and_rtc_time(void);
+void _wifi_init(const char *p_ssid, const char *p_password);
+void _wifi_main(void);
 // -----------------------------------------------------------
 // [Static]
 
@@ -126,8 +124,7 @@ WIFI_RETRY:
 #if 1
     while((WiFi.status() != WL_CONNECTED) || (s_is_wifi_connect == false))
     {
-        delay(1000);
-        Serial.print(".");
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
         retry_count++;
 
         // WiFiイベントハンドラで何かしらの切断イベントが発生
@@ -170,35 +167,12 @@ static void _wifi_disconnet(void)
 }
 #endif
 
-static bool _get_wifi_auth_mode_data(wifi_auth_mode_t auth_mode, app_wifi_auth_data_t *p_output_data)
-{
-    bool ret;
-    uint8_t i;
-
-    if(p_output_data == NULL) {
-        return false;
-    }
-
-    ret = false;
-    p_output_data->p_auth_str = "none";
-
-    for(i = 0; i < WIFI_AUTH_DATA_TBL_SIZE; i++)
-    {
-        if(g_wifi_auth_data_tbl[i].auth_mode == auth_mode) {
-            *p_output_data = g_wifi_auth_data_tbl[i];
-            ret = true;
-        }
-    }
-
-    return ret;
-}
-
-static void _get_ntp_and_rtc_time(void)
+static bool _get_ntp_and_rtc_time(void)
 {
     struct tm utc_tm;
     struct tm jst_tm;
 
-    if(s_is_ntp_sync != true) {
+    if(s_is_ntp_sync == false) {
         // NTPに接続してUTCとJSTを取得
         configTime(NTP_TIMEZONE_JST, 0, gp_ntp_server_tbl[0], gp_ntp_server_tbl[1], gp_ntp_server_tbl[2]);
         s_utc_time = time(nullptr);
@@ -206,51 +180,99 @@ static void _get_ntp_and_rtc_time(void)
 
         // NTPと時刻同期が未完了なので終了
         if(sp_utc_tm->tm_year <= 70) {
-            return;
+            return s_is_ntp_sync;
         }
 
         // UTCからJSTに変換
         sp_jst_tm = localtime_r(&s_utc_time, &jst_tm);
 
-        // NTPと時刻同期したのでフラグを降ろす
+        // NTPと時刻同期したのでフラグを立てとく
         s_is_ntp_sync = true;
         Serial.printf("NTP time Sync RTC Succes!\r\n");
 
         // WiFi切断
         // _wifi_disconnet();
-    } else {
-        // ESP32内蔵のRTCから時刻を取得
-        s_utc_time = time(nullptr);
-        sp_utc_tm = gmtime_r(&s_utc_time, &utc_tm);
-        sp_jst_tm = localtime_r(&s_utc_time, &jst_tm);
-        Serial.printf("Get RTC Time\r\n");
     }
 
-    // 時刻表示
-#if 0
-    Serial.printf("UTC Time: %04d/%02d/%02d %02d:%02d:%02d\r\n",
-        sp_utc_tm->tm_year + 1900, sp_utc_tm->tm_mon + 1, sp_utc_tm->tm_mday,
-        sp_utc_tm->tm_hour, sp_utc_tm->tm_min, sp_utc_tm->tm_sec);
-#else
-    Serial.printf("JST Time: %04d/%02d/%02d %02d:%02d:%02d\r\n",
-        sp_jst_tm->tm_year + 1900, sp_jst_tm->tm_mon + 1, sp_jst_tm->tm_mday,
-        sp_jst_tm->tm_hour, sp_jst_tm->tm_min, sp_jst_tm->tm_sec);
-#endif
+    return s_is_ntp_sync;
 }
-// -----------------------------------------------------------
-// [API]
 
-void app_wifi_init(const char *p_ssid, const char *p_password)
+void _wifi_init(const char *p_ssid, const char *p_password)
 {
     _wifi_connet(p_ssid, p_password);
 }
 
-void app_wifi_main(void)
+void _wifi_main(void)
 {
-    // WiFiエラー発生中は処理しない
+    struct tm utc_tm;
+    struct tm jst_tm;
+
+    // WiFi未接続時は何も処理しない
+    if(s_is_wifi_connect == false) {
+        return;
+    }
+
+    // WiFiのエラーが発生してたら処理しない
     if(s_wifi_err == WIFI_ERROR_UNKNOWN) {
         return;
     }
 
-    _get_ntp_and_rtc_time(); // NTPとの時刻同期
+    // NTPと時刻同期
+    if(s_is_ntp_sync == false) {
+        _get_ntp_and_rtc_time();
+    } else {
+        s_utc_time = time(nullptr);
+        sp_utc_tm = gmtime_r(&s_utc_time, &utc_tm);
+        sp_jst_tm = localtime_r(&s_utc_time, &jst_tm);
+
+        Serial.printf("JST Time: %04d/%02d/%02d %02d:%02d:%02d\r\n",
+            sp_jst_tm->tm_year + 1900, sp_jst_tm->tm_mon + 1, sp_jst_tm->tm_mday,
+            sp_jst_tm->tm_hour, sp_jst_tm->tm_min, sp_jst_tm->tm_sec);
+    }
 }
+
+// -----------------------------------------------------------
+// [FreeRTOSタスク]
+
+void vTaskWiFiInit(void *p_param)
+{
+    Serial.printf("[DEBUG] vTaskWiFiInit Create\n");
+
+    // WiFi接続
+    _wifi_init(g_wifi_ssid, g_wifi_password);
+
+    // WiFiの接続完了をvTaskWiFiタスクに通知
+    xTaskNotifyGive(g_xTaskWiFi);
+
+    // タスク終了
+    Serial.printf("[DEBUG] vTaskWiFiInit: WiFI Connected!! Task Kill! Good Bye!\n");
+    vTaskDelete(NULL);
+}
+
+void vTaskWiFi(void *p_param)
+{
+    Serial.printf("[DEBUG] vTaskWiFi Create\n");
+
+    // [WiFi初期化タスク @CPU Core 0]
+    xTaskCreatePinnedToCore(vTaskWiFiInit,     // コールバック関数ポインタ
+                            "vTaskWiFiInit",   // タスク名
+                            8192,              // スタック
+                            NULL,              // パラメータ
+                            7,                 // 優先度(0～7、7が最優先)
+                            &s_xTaskWiFiInit,  // ハンドル
+                            DRV_CPU_CORE       // CPUのコア選択
+                            );
+
+    // vTaskWiFiInitタスクからWiFiの接続完了の通知が来るまで待機
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+    // WiFi接続完了したのでWiFiのアプリを開始
+    Serial.printf("[DEBUG] vTaskWiFi: WiFi App Start\n");
+
+    while(1)
+    {
+        _wifi_main();
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+#endif // (PCB_TYPE == JS_ESP32P4_M3_DEV)

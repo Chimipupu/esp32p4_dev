@@ -19,15 +19,17 @@
 #include <stdbool.h>
 
 // -----------------------------------------------------------
-#define MY_WIFI_SSID       "YOUR-WIFI-SSID"     // WiFiのSSID
-#define MY_WIFI_PASSWORD   "YOUR-WIFI-PASSWORD" // WiFiのパスワード
+#define MY_WIFI_SSID       "B4865595449D-2G" // WiFiのSSID
+#define MY_WIFI_PASSWORD   "55351108940066"  // WiFiのパスワード
 #if !defined(MY_WIFI_SSID) || !defined(MY_WIFI_PASSWORD)
 #error "[ERROR] Please define Your Wifi SSID and Password in app_wifi.h"
 #endif
 
 #define NTP_TIMEZONE_JST    (9 * 3600) // 日本標準時のタイムゾーン（UTC+9）
 // -----------------------------------------------------------
-void app_wifi_init(const char *p_ssid, const char *p_password);
-void app_wifi_main(void);
+#if (PCB_TYPE == JS_ESP32P4_M3_DEV)
+extern xTaskHandle g_xTaskWiFi;
+void vTaskWiFi(void *p_param);
+#endif
 
 #endif // APP_WIFI_H

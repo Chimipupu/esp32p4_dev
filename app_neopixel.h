@@ -20,10 +20,14 @@
 #define DEBUG_RGB_LED
 
 // ------------------------------------------------------------------------------
-typedef struct {
-    uint8_t red;
-    uint8_t green;
-    uint8_t blue;
+typedef union {
+    uint32_t rgb;
+    struct {
+        uint32_t red : 8;
+        uint32_t green : 8;
+        uint32_t blue : 8;
+        uint32_t reserved : 8;
+    } para;
 } led_color_t;
 
 typedef struct {
@@ -31,6 +35,8 @@ typedef struct {
     const char *p_color_str;
 } led_color_data_t;
 
+extern const led_color_data_t g_led_color_tbl[];
+extern const uint8_t RGBLED_COLOR_TBL_SIZE;
 // ------------------------------------------------------------------------------
 void app_neopixel_init(uint8_t led_pin, uint8_t led_num, uint8_t brightness);
 void app_neopixel_set_rgb(uint8_t led_no, led_color_t *p_rgb);

@@ -13,6 +13,8 @@
 
 #ifdef RGBLED_USE
 #include "app_neopixel.h"
+static led_color_t s_request_rgb_led_val = {.rgb = 0x000000};
+static led_color_t s_local_rgb_led_val = {.rgb = 0x000000};
 #endif
 
 #ifdef WIFI_USE
@@ -48,6 +50,7 @@ static xTaskHandle s_xTaskCore0;
 static xTaskHandle s_xTaskCore1;
 static void vTaskCore0(void *p_param);
 static void vTaskCore1(void *p_param);
+QueueHandle_t g_queue_handle_core2core = NULL;
 
 #ifdef DEBUG_TASK
 static xTaskHandle s_xTaskDebug;
@@ -118,24 +121,53 @@ static void _pcb_init(void)
 
 static void vTaskCore0(void *p_param)
 {
-    Serial.printf("[CPU Core 0] vTaskCore0\n");
+    BaseType_t que_status;
+    static uint8_t s_core_num = xPortGetCoreID();
+    Serial.printf("[CPU Core %d] vTaskCore0\n", s_core_num);
 
     while (1)
     {
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        que_status = xQueueReceive(g_queue_handle_core2core,
+                                    &s_local_rgb_led_val,
+                                    portMAX_DELAY);
+        if(que_status == pdPASS)
+        {
+#ifdef RGBLED_USE
+            app_neopixel_set_rgb(0, &s_local_rgb_led_val);
+            Serial.printf("[CPU Core %d] RGB_LED: Set Color = (0x%02X, 0x%02X, 0x%02X)\n", s_core_num,
+                            s_local_rgb_led_val.para.red,
+                            s_local_rgb_led_val.para.green,
+                            s_local_rgb_led_val.para.blue);
+#endif
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
 static void vTaskCore1(void *p_param)
 {
-    Serial.printf("[CPU Core 1] vTaskCore1\n");
+    BaseType_t que_status;
+    static uint8_t s_tbl_idx = 0;
+    static uint8_t s_core_num = xPortGetCoreID();
+    Serial.printf("[CPU Core %d] vTaskCore1\n", s_core_num);
 
     while (1)
     {
 #ifdef RGBLED_USE
-        app_neopixel_rgb_illumination(0);
+        que_status = xQueueSend(g_queue_handle_core2core,
+                                &s_request_rgb_led_val,
+                                portMAX_DELAY);
+
+        if(que_status == pdPASS)
+        {
+            s_request_rgb_led_val.para.red = g_led_color_tbl[s_tbl_idx].rgb.para.red;
+            s_request_rgb_led_val.para.green = g_led_color_tbl[s_tbl_idx].rgb.para.green;
+            s_request_rgb_led_val.para.blue = g_led_color_tbl[s_tbl_idx].rgb.para.blue;
+            Serial.printf("[CPU Core %d] RGB_LED: Request Color = %s\n", s_core_num, g_led_color_tbl[s_tbl_idx].p_color_str);
+            s_tbl_idx = (s_tbl_idx + 1) % (RGBLED_COLOR_TBL_SIZE - 1);
+        }
 #endif
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 }
 
@@ -156,7 +188,11 @@ static void vTaskDebug(void *p_param)
 
 static void _freertos_init(void)
 {
-#if 1
+    // キューの作成
+#ifdef RGBLED_USE
+    g_queue_handle_core2core = xQueueCreate(8, sizeof(led_color_t));
+#endif
+
     // [RTOSタスク @CPU Core 0]
     xTaskCreatePinnedToCore(vTaskCore0,        // コールバック関数ポインタ
                             "vTaskCore0",      // タスク名
@@ -166,7 +202,6 @@ static void _freertos_init(void)
                             &s_xTaskCore0,     // ハンドル
                             DRV_CPU_CORE       // CPUのコア選択
                             );
-#endif
 
 #ifdef WIFI_USE
     // [WiFiタスク @CPU Core 0]
@@ -180,7 +215,6 @@ static void _freertos_init(void)
                             );
 #endif // WIFI_USE
 
-#if 1
     // [RTOSタスク @CPU Core 1]
     xTaskCreatePinnedToCore(vTaskCore1,        // コールバック関数ポインタ
                             "vTaskCore1",      // タスク名
@@ -190,7 +224,6 @@ static void _freertos_init(void)
                             &s_xTaskCore1,     // ハンドル
                             APP_PROC_CORE      // CPUのコア選択
                             );
-#endif
 
 #ifdef DEBUG_TASK
     // [デバッグ用のタスク @CPU Core 1]

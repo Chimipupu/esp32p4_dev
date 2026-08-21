@@ -12,19 +12,18 @@
 
 #ifdef RGBLED_USE
 // -----------------------------------------------------------
-// LEDカラーテーブル
-static const led_color_data_t g_led_color_tbl[] = {
-//   |  R  |  G  |  B  |
-    { { 255,   0,   0 }, "RED" },    // 赤
-    { { 255, 255,   0 }, "YELLOW" }, // 黄
-    { { 255, 165,   0 }, "ORANGE" }, // 橙
-    { {   0, 255,   0 }, "GREEN" },  // 緑
-    { {   0,   0, 255 }, "BLUE" },   // 青
-    { { 255,   0, 255 }, "PURPLE" }, // 紫
-    { { 255, 255, 255 }, "WHITE" },  // 白
-    { {   0,   0,   0 }, "OFF" }     // オフ（黒・終端）
+// RGBLEDカラーテーブル
+const led_color_data_t g_led_color_tbl[] = {
+    { { .rgb = 0x00FF0000 }, "RED" },    // 赤
+    { { .rgb = 0x00FFFF00 }, "YELLOW" }, // 黄
+    { { .rgb = 0x00FFA500 }, "ORANGE" }, // 橙
+    { { .rgb = 0x0000FF00 }, "GREEN" },  // 緑
+    { { .rgb = 0x000000FF }, "BLUE" },   // 青
+    { { .rgb = 0x00FF00FF }, "PURPLE" }, // 紫
+    { { .rgb = 0x00FFFFFF }, "WHITE" },  // 白
+    { { .rgb = 0x00000000 }, "OFF" }     // 消灯
 };
-static const uint8_t LED_COLOR_TBL_SIZE = sizeof(g_led_color_tbl) / sizeof(g_led_color_tbl[0]);
+const uint8_t RGBLED_COLOR_TBL_SIZE = sizeof(g_led_color_tbl) / sizeof(g_led_color_tbl[0]);
 
 static Adafruit_NeoPixel *s_p_pixel = NULL;
 static uint8_t s_led_num = 0;
@@ -42,7 +41,7 @@ if (s_p_pixel == NULL) {
     }
 
     s_p_pixel->clear();
-    s_p_pixel->setPixelColor(led_no, s_p_pixel->Color(p_rgb->red, p_rgb->green,p_rgb->blue));
+    s_p_pixel->setPixelColor(led_no, s_p_pixel->Color(p_rgb->para.red, p_rgb->para.green, p_rgb->para.blue));
     s_p_pixel->setBrightness(brightness);
     s_p_pixel->show();
 }
@@ -113,7 +112,7 @@ void app_neopixel_rgb_illumination(uint8_t led_no)
 
     s_p_rgb_buf[led_no] = g_led_color_tbl[s_idx].rgb;
     app_neopixel_set_rgb(led_no, &s_p_rgb_buf[led_no]);
-    s_idx = (s_idx + 1) % (LED_COLOR_TBL_SIZE - 1);
+    s_idx = (s_idx + 1) % (RGBLED_COLOR_TBL_SIZE - 1);
 }
 
 /**

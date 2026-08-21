@@ -158,16 +158,19 @@ static void vTaskCore1(void *p_param)
                                 &s_request_rgb_led_val,
                                 portMAX_DELAY);
 
+        // キューの送信完了を受けて次のデータを用意しておく
         if(que_status == pdPASS)
         {
-            s_request_rgb_led_val.para.red = g_led_color_tbl[s_tbl_idx].rgb.para.red;
-            s_request_rgb_led_val.para.green = g_led_color_tbl[s_tbl_idx].rgb.para.green;
-            s_request_rgb_led_val.para.blue = g_led_color_tbl[s_tbl_idx].rgb.para.blue;
-            Serial.printf("[CPU Core %d] RGB_LED: Request Color = %s\n", s_core_num, g_led_color_tbl[s_tbl_idx].p_color_str);
+            Serial.printf("[CPU Core %d] RGB_LED: Request Color = (0x%02X, 0x%02X, 0x%02X)\n", s_core_num,
+                            g_led_color_tbl[s_tbl_idx].rgb.para.red,
+                            g_led_color_tbl[s_tbl_idx].rgb.para.green,
+                            g_led_color_tbl[s_tbl_idx].rgb.para.blue);
+
+            s_request_rgb_led_val.rgb = g_led_color_tbl[s_tbl_idx].rgb.rgb;
             s_tbl_idx = (s_tbl_idx + 1) % (RGBLED_COLOR_TBL_SIZE - 1);
         }
 #endif
-        vTaskDelay(200 / portTICK_PERIOD_MS);
+        vTaskDelay(500 / portTICK_PERIOD_MS);
     }
 }
 

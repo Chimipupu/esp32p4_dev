@@ -3,7 +3,7 @@
  * @author Chimipupu(https://github.com/Chimipupu)
  * @brief アプリメイン
  * @version 0.1
- * @date 2026-08-06
+ * @date 2026-08-21
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 
@@ -11,11 +11,11 @@
 #include "common.h"
 #include "pcb_def.h"
 
-#if (PCB_TYPE == WT9932P4_TINY)
+#ifdef RGBLED_USE
 #include "app_neopixel.h"
 #endif
 
-#if (PCB_TYPE == JS_ESP32P4_M3_DEV)
+#ifdef WIFI_USE
 #include "app_wifi.h"
 static const char *g_wifi_ssid = MY_WIFI_SSID;
 static const char *g_wifi_password = MY_WIFI_PASSWORD;
@@ -45,14 +45,14 @@ const char *p_esp_idf_ver_str = NULL;
 
 // FreeRTOS関連
 static xTaskHandle s_xTaskCore0;
-// static xTaskHandle s_xTaskCore1;
+static xTaskHandle s_xTaskCore1;
+static void vTaskCore0(void *p_param);
+static void vTaskCore1(void *p_param);
+
 #ifdef DEBUG_TASK
 static xTaskHandle s_xTaskDebug;
 static void vTaskDebug(void *p_param);
 #endif // DEBUG_TASK
-static void vTaskCore0(void *p_param);
-
-// static void vTaskCore1(void *p_param);
 
 static void _freertos_init(void);
 static void _mcu_init(void);
@@ -67,7 +67,7 @@ static void _mcu_init(void)
     Serial.begin(115200);
     delay(100);
 
-#if (PCB_TYPE == WT9932P4_TINY)
+#ifdef RGBLED_USE
     // RGBLED(Neopixel)初期化
     app_neopixel_init(RGBLED_PIN, RGBLED_NUM, RGBLED_MAX_BRIGHTNESS);
 #endif
@@ -126,20 +126,18 @@ static void vTaskCore0(void *p_param)
     }
 }
 
-#if 0
 static void vTaskCore1(void *p_param)
 {
     Serial.printf("[CPU Core 1] vTaskCore1\n");
 
     while (1)
     {
-#if (PCB_TYPE == WT9932P4_TINY)
+#ifdef RGBLED_USE
         app_neopixel_rgb_illumination(0);
 #endif
         vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
 }
-#endif
 
 #ifdef DEBUG_TASK
 static void vTaskDebug(void *p_param)
@@ -170,7 +168,7 @@ static void _freertos_init(void)
                             );
 #endif
 
-#if (PCB_TYPE == JS_ESP32P4_M3_DEV)
+#ifdef WIFI_USE
     // [WiFiタスク @CPU Core 0]
     xTaskCreatePinnedToCore(vTaskWiFi,         // コールバック関数ポインタ
                             "vTaskWiFi",       // タスク名
@@ -180,9 +178,9 @@ static void _freertos_init(void)
                             &g_xTaskWiFi,      // ハンドル
                             DRV_CPU_CORE       // CPUのコア選択
                             );
-#endif // (PCB_TYPE == JS_ESP32P4_M3_DEV)
+#endif // WIFI_USE
 
-#if 0
+#if 1
     // [RTOSタスク @CPU Core 1]
     xTaskCreatePinnedToCore(vTaskCore1,        // コールバック関数ポインタ
                             "vTaskCore1",      // タスク名

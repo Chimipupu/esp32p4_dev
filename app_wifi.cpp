@@ -4,7 +4,7 @@
  * @brief WiFiアプリ (for ESP32-P4)
  * @note ESP32-P4とSDIOで接続されてるESP32-C6専用の実装
  * @version 0.1
- * @date 2026-08-06
+ * @date 2026-08-21
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 
@@ -13,7 +13,7 @@
 #include "pcb_def.h"
 #include "time.h"
 
-#if (PCB_TYPE == JS_ESP32P4_M3_DEV)
+#ifdef WIFI_USE
 // -----------------------------------------------------------
 // [FreeRTOS関連]
 xTaskHandle g_xTaskWiFi;
@@ -275,4 +275,4 @@ void vTaskWiFi(void *p_param)
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
-#endif // (PCB_TYPE == JS_ESP32P4_M3_DEV)
+#endif // WIFI_USE

@@ -3,12 +3,15 @@
  * @author Chimipupu(https://github.com/Chimipupu)
  * @brief NeoPixelアプリ
  * @version 0.1
- * @date 2026-08-06
+ * @date 2026-08-21
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 #ifndef APP_NEOPIXEL_HPP
 #define APP_NEOPIXEL_HPP
 
+#include "pcb_def.h"
+
+#ifdef RGBLED_USE
 #include "common.h"
 #include <Adafruit_NeoPixel.h>
 
@@ -33,5 +36,7 @@ void app_neopixel_init(uint8_t led_pin, uint8_t led_num, uint8_t brightness);
 void app_neopixel_set_rgb(uint8_t led_no, led_color_t *p_rgb);
 void app_neopixel_rgb_illumination(uint8_t led_no);
 void app_neopixel_set_brightness(uint8_t brightness);
+// ---------------------------------------------------
+#endif // RGBLED_USE
 
 #endif /* APP_NEOPIXEL_HPP */

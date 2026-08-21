@@ -3,13 +3,14 @@
  * @author Chimipupu(https://github.com/Chimipupu)
  * @brief NeoPixelアプリ
  * @version 0.1
- * @date 2026-08-06
+ * @date 2026-08-21
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 
 #include "app_neopixel.h"
 #include "pcb_def.h"
 
+#ifdef RGBLED_USE
 // -----------------------------------------------------------
 // LEDカラーテーブル
 static const led_color_data_t g_led_color_tbl[] = {
@@ -123,3 +124,6 @@ void app_neopixel_set_brightness(uint8_t brightness)
 {
     s_brightness = brightness;
 }
+
+// ---------------------------------------------------
+#endif // RGBLED_USE

@@ -4,32 +4,34 @@
 
 ###  H/W
 
-  - SoC
-    - ESP32-P4
-      - FPU: 単精度
-      - Flash: 16MB
-      - CPU
-        - 32bit RISC-V `RV32IMAFC`
-        - コア数: x2
-      - Clock
-        - 360MHz
-          - ※チップリビジョンがv1.0~v3.0のみ
-        - 400MHz
-          - ※チップリビジョンがv3.1以降のみ
-      - FPU
-        - 単精度
-      - RAM
-        - SRAM: 768
-        - PSRAM: 32MB
-    - デバッガ
-        - ESP32-P4内蔵 JTAG
-    - 基板
-        - `WT9932P4-TINY`
-            - RGBLED: WS2812 x1個
-            - WiFi/Bluetooth: (N/A)
-        - `JS-ESP32P4-M3-DEV`
-            - RGBLED: (N/A)
-            - WiFi/Bluetooth: ESP32-C6
+- SoC
+  - ESP32-P4
+    - FPU: 単精度
+    - Flash: 16MB
+    - CPU
+      - 32bit RISC-V `RV32IMAFC`
+      - コア数: x2
+    - Clock
+      - 360MHz
+        - ※チップリビジョンがv1.0~v3.0のみ
+      - 400MHz
+        - ※チップリビジョンがv3.1以降のみ
+    - FPU
+      - 単精度
+    - RAM
+      - SRAM: 768
+      - PSRAM: 32MB
+    - GPIO
+      - 55本
+- デバッガ
+    - ESP32-P4内蔵 JTAG
+- 基板
+    - `WT9932P4-TINY`
+        - RGBLED: WS2812 x1個
+        - WiFi/Bluetooth: (N/A)
+    - `JS-ESP32P4-M3-DEV`
+        - RGBLED: (N/A)
+        - WiFi/Bluetooth: ESP32-C6
 
 ### S/W
 

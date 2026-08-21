@@ -29,6 +29,10 @@ static void _dbg_pcb_info_print(void);
 
 // ---------------------------------------------------
 // [グローバル]
+typedef struct {
+    char msg[128];
+} log_msg_t;
+
 #if (PCB_TYPE == JS_ESP32P4_M3_DEV)
 const char *p_pcb_name_str = "JS-ESP32P4-M3-DEV";
 #elif (PCB_TYPE == WT9932P4_TINY)
@@ -48,14 +52,13 @@ const char *p_esp_idf_ver_str = NULL;
 // FreeRTOS関連
 static xTaskHandle s_xTaskCore0;
 static xTaskHandle s_xTaskCore1;
+static xTaskHandle s_xTaskDebugLog;
+QueueHandle_t g_queue_handle_core2core = NULL;
+QueueHandle_t g_queue_handle_log = NULL;
+
 static void vTaskCore0(void *p_param);
 static void vTaskCore1(void *p_param);
-QueueHandle_t g_queue_handle_core2core = NULL;
-
-#ifdef DEBUG_TASK
-static xTaskHandle s_xTaskDebug;
-static void vTaskDebug(void *p_param);
-#endif // DEBUG_TASK
+static void vTaskDebugLog(void *p_param);
 
 static void _freertos_init(void);
 static void _mcu_init(void);
@@ -122,8 +125,11 @@ static void _pcb_init(void)
 static void vTaskCore0(void *p_param)
 {
     BaseType_t que_status;
+    log_msg_t log_msg;
     static uint8_t s_core_num = xPortGetCoreID();
-    Serial.printf("[CPU Core %d] vTaskCore0\n", s_core_num);
+
+    snprintf(log_msg.msg, sizeof(log_msg.msg), "[CPU Core %d] vTaskCore1\n", s_core_num);
+    xQueueSend(g_queue_handle_log, &log_msg, 0);
 
     while (1)
     {
@@ -134,10 +140,13 @@ static void vTaskCore0(void *p_param)
         {
 #ifdef RGBLED_USE
             app_neopixel_set_rgb(0, &s_local_rgb_led_val);
-            Serial.printf("[CPU Core %d] RGB_LED: Set Color = (0x%02X, 0x%02X, 0x%02X)\n", s_core_num,
-                            s_local_rgb_led_val.para.red,
-                            s_local_rgb_led_val.para.green,
-                            s_local_rgb_led_val.para.blue);
+            snprintf(log_msg.msg, sizeof(log_msg.msg),
+                    "[CPU Core %d] RGB_LED: Set Color = (0x%02X, 0x%02X, 0x%02X)\n",
+                    s_core_num,
+                    s_local_rgb_led_val.para.red,
+                    s_local_rgb_led_val.para.green,
+                    s_local_rgb_led_val.para.blue);
+            xQueueSend(g_queue_handle_log, &log_msg, 0);
 #endif
         }
         vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -147,9 +156,13 @@ static void vTaskCore0(void *p_param)
 static void vTaskCore1(void *p_param)
 {
     BaseType_t que_status;
+    log_msg_t log_msg;
+
     static uint8_t s_tbl_idx = 0;
     static uint8_t s_core_num = xPortGetCoreID();
-    Serial.printf("[CPU Core %d] vTaskCore1\n", s_core_num);
+
+    snprintf(log_msg.msg, sizeof(log_msg.msg), "[CPU Core %d] vTaskCore1\n", s_core_num);
+    xQueueSend(g_queue_handle_log, &log_msg, 0);
 
     while (1)
     {
@@ -161,37 +174,48 @@ static void vTaskCore1(void *p_param)
         // キューの送信完了を受けて次のデータを用意しておく
         if(que_status == pdPASS)
         {
-            Serial.printf("[CPU Core %d] RGB_LED: Request Color = (0x%02X, 0x%02X, 0x%02X)\n", s_core_num,
-                            g_led_color_tbl[s_tbl_idx].rgb.para.red,
-                            g_led_color_tbl[s_tbl_idx].rgb.para.green,
-                            g_led_color_tbl[s_tbl_idx].rgb.para.blue);
+            snprintf(log_msg.msg, sizeof(log_msg.msg),
+                    "[CPU Core %d] RGB_LED: Request Color = (0x%02X, 0x%02X, 0x%02X)\n",
+                    s_core_num,
+                    s_request_rgb_led_val.para.red,
+                    s_request_rgb_led_val.para.green,
+                    s_request_rgb_led_val.para.blue);
+            xQueueSend(g_queue_handle_log, &log_msg, 0);
 
             s_request_rgb_led_val.rgb = g_led_color_tbl[s_tbl_idx].rgb.rgb;
             s_tbl_idx = (s_tbl_idx + 1) % (RGBLED_COLOR_TBL_SIZE - 1);
         }
 #endif
-        vTaskDelay(500 / portTICK_PERIOD_MS);
+        vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 }
 
-#ifdef DEBUG_TASK
-static void vTaskDebug(void *p_param)
+static void vTaskDebugLog(void *p_param)
 {
-    static uint8_t s_cpu_core = xPortGetCoreID();
-
-    Serial.printf("[CPU Core %d] vTaskDebug\n", s_cpu_core);
+    BaseType_t que_status;
+    log_msg_t log_msg;
+    // static uint8_t s_cpu_core = xPortGetCoreID();
 
     while (1)
     {
-        _dbg_pcb_info_print();
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        que_status = xQueueReceive(g_queue_handle_log,
+                                    &log_msg,
+                                    portMAX_DELAY);
+
+        if(que_status == pdPASS)
+        {
+            Serial.printf("%s", log_msg.msg);
+            memset(&log_msg.msg[0], 0x00, sizeof(log_msg.msg));
+        }
+
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
-#endif // DEBUG_TASK
 
 static void _freertos_init(void)
 {
     // キューの作成
+    g_queue_handle_log = xQueueCreate(16, sizeof(log_msg_t));
 #ifdef RGBLED_USE
     g_queue_handle_core2core = xQueueCreate(8, sizeof(led_color_t));
 #endif
@@ -228,17 +252,15 @@ static void _freertos_init(void)
                             APP_PROC_CORE      // CPUのコア選択
                             );
 
-#ifdef DEBUG_TASK
-    // [デバッグ用のタスク @CPU Core 1]
-    xTaskCreatePinnedToCore(vTaskDebug,        // コールバック関数ポインタ
-                            "vTaskDebug",      // タスク名
+    // [デバッグ用のログをprintf()するだけのタスク @CPU Core 1]
+    xTaskCreatePinnedToCore(vTaskDebugLog,     // コールバック関数ポインタ
+                            "vTaskDebugLog",   // タスク名
                             4096,              // スタック
                             NULL,              // パラメータ
-                            1,                 // 優先度(0～7、7が最優先)
-                            &s_xTaskDebug,     // ハンドル
+                            0,                 // 優先度(0～7、7が最優先)
+                            &s_xTaskDebugLog,     // ハンドル
                             APP_PROC_CORE      // CPUのコア選択
                             );
-#endif // DEBUG_TASK
 }
 
 // ---------------------------------------------------

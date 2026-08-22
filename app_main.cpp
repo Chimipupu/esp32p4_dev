@@ -17,6 +17,7 @@
 static QueueHandle_t s_queue_handle_rgbled_data = NULL;
 static led_color_t s_request_rgb_led_val = {.rgb = 0x000000};
 static led_color_t s_local_rgb_led_val = {.rgb = 0x000000};
+static void vTaskRgbLed(void *p_param);
 #endif
 
 #ifdef WIFI_USE
@@ -28,19 +29,29 @@ static const char *g_wifi_password = MY_WIFI_PASSWORD;
 // ---------------------------------------------------
 // [DEBUG関連]
 #define QUE_SIZE_DEBUG_LOG    8
+static xTaskHandle s_xTaskDebugLog;
 static QueueHandle_t s_queue_handle_log = NULL;
+
 static void _dbg_pcb_info_print(void);
 static void DBG_LOG_PRINT(QueueHandle_t queue_handle, const char *p_msg, ...);
+static void vTaskDebugLog(void *p_param);
 
 // ---------------------------------------------------
 // [FreeRTOS関連]
+#define QUE_SIZE_CORE_COM    8
+
+typedef struct {
+    bool is_test_mode;
+    uint8_t test_mode_val;
+} core_com_data_t;
+
 static xTaskHandle s_xTaskCore0;
 static xTaskHandle s_xTaskCore1;
-static xTaskHandle s_xTaskDebugLog;
+static xTaskHandle s_xTaskRgbLed;
+static QueueHandle_t s_queue_handle_core_com = NULL;
 
 static void vTaskCore0(void *p_param);
 static void vTaskCore1(void *p_param);
-static void vTaskDebugLog(void *p_param);
 
 // ---------------------------------------------------
 typedef struct {
@@ -144,6 +155,9 @@ static void _pcb_init(void)
     _dbg_pcb_info_print();
 }
 
+// ---------------------------------------------------
+// [FreeRTOSタスク(CPU Core0)]
+
 static void vTaskCore0(void *p_param)
 {
     BaseType_t que_status;
@@ -151,9 +165,49 @@ static void vTaskCore0(void *p_param)
 
     DBG_LOG_PRINT(s_queue_handle_log, "[CPU Core %d] vTaskCore0\n", s_core_num);
 
+#ifdef RGBLED_USE
+    xTaskCreatePinnedToCore(vTaskRgbLed,       // コールバック関数ポインタ
+                            "vTaskRgbLed",     // タスク名
+                            1024,              // スタック
+                            NULL,              // パラメータ
+                            1,                 // 優先度(0～7、7が最優先)
+                            &s_xTaskRgbLed,    // ハンドル
+                            DRV_CPU_CORE       // CPUのコア選択
+                            );
+#endif
+
+#ifdef WIFI_USE
+    // [WiFiタスク @CPU Core 0]
+    xTaskCreatePinnedToCore(vTaskWiFi,         // コールバック関数ポインタ
+                            "vTaskWiFi",       // タスク名
+                            8192,              // スタック
+                            NULL,              // パラメータ
+                            6,                 // 優先度(0～7、7が最優先)
+                            &g_xTaskWiFi,      // ハンドル
+                            DRV_CPU_CORE       // CPUのコア選択
+                            );
+#endif // WIFI_USE
+
     while (1)
     {
+        que_status = xQueueReceive(s_queue_handle_core_com,
+                                    &s_local_rgb_led_val,
+                                    portMAX_DELAY);
+
+        if(que_status == pdPASS)
+        {
+            // TODO
+        }
+    }
+}
+
 #ifdef RGBLED_USE
+static void vTaskRgbLed(void *p_param)
+{
+    BaseType_t que_status;
+
+    while (1)
+    {
         que_status = xQueueReceive(s_queue_handle_rgbled_data,
                                     &s_local_rgb_led_val,
                                     portMAX_DELAY);
@@ -161,18 +215,20 @@ static void vTaskCore0(void *p_param)
         if(que_status == pdPASS)
         {
             app_neopixel_set_rgb(0, &s_local_rgb_led_val);
+#if 0
             DBG_LOG_PRINT(s_queue_handle_log,
-                    "[CPU Core %d] RGB_LED: Set Color = (0x%02X, 0x%02X, 0x%02X)\n",
-                    s_core_num,
+                    "[vTaskRgbLed] RGB_LED: Set Color = (0x%02X, 0x%02X, 0x%02X)\n",
                     s_local_rgb_led_val.para.red,
                     s_local_rgb_led_val.para.green,
                     s_local_rgb_led_val.para.blue);
 #endif
         }
-
-        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
+#endif
+
+// ---------------------------------------------------
+// [FreeRTOSタスク(CPU Core1)]
 
 static void vTaskCore1(void *p_param)
 {
@@ -193,19 +249,19 @@ static void vTaskCore1(void *p_param)
         // キューの送信完了を受けて次のデータを用意しておく
         if(que_status == pdPASS)
         {
+#if 1
             DBG_LOG_PRINT(s_queue_handle_log,
-                    "[CPU Core %d] RGB_LED: Request Color = (0x%02X, 0x%02X, 0x%02X)\n",
-                    s_core_num,
+                    "[vTaskCore1] RGB_LED: Request Color = (0x%02X, 0x%02X, 0x%02X)\n",
                     s_request_rgb_led_val.para.red,
                     s_request_rgb_led_val.para.green,
                     s_request_rgb_led_val.para.blue);
-
+#endif
             s_request_rgb_led_val.rgb = g_led_color_tbl[s_tbl_idx].rgb.rgb;
             s_tbl_idx = (s_tbl_idx + 1) % (RGBLED_COLOR_TBL_SIZE - 1);
         }
 #endif
 
-        vTaskDelay(200 / portTICK_PERIOD_MS);
+        vTaskDelay(500 / portTICK_PERIOD_MS);
     }
 }
 
@@ -231,6 +287,7 @@ static void vTaskDebugLog(void *p_param)
 static void _freertos_init(void)
 {
     // キューの作成
+    s_queue_handle_core_com = xQueueCreate(QUE_SIZE_CORE_COM, sizeof(core_com_data_t));
     s_queue_handle_log = xQueueCreate(QUE_SIZE_DEBUG_LOG, sizeof(log_msg_t));
 #ifdef RGBLED_USE
     s_queue_handle_rgbled_data = xQueueCreate(QUE_SIZE_RGBLED_DATA, sizeof(led_color_t));
@@ -255,18 +312,6 @@ static void _freertos_init(void)
                             &s_xTaskCore0,     // ハンドル
                             DRV_CPU_CORE       // CPUのコア選択
                             );
-
-#ifdef WIFI_USE
-    // [WiFiタスク @CPU Core 0]
-    xTaskCreatePinnedToCore(vTaskWiFi,         // コールバック関数ポインタ
-                            "vTaskWiFi",       // タスク名
-                            8192,              // スタック
-                            NULL,              // パラメータ
-                            6,                 // 優先度(0～7、7が最優先)
-                            &g_xTaskWiFi,      // ハンドル
-                            DRV_CPU_CORE       // CPUのコア選択
-                            );
-#endif // WIFI_USE
 
     // [RTOSタスク @CPU Core 1]
     xTaskCreatePinnedToCore(vTaskCore1,        // コールバック関数ポインタ

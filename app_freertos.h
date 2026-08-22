@@ -12,7 +12,7 @@
 
 // #define DEBUG_TASK
 
-static void DBG_LOG_PRINT(const char *p_msg, ...);
+void DBG_LOG_PRINT(const char *p_msg, ...);
 void app_freertos_init(void);
 
 #endif // APP_FREERTOS_H

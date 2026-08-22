@@ -29,7 +29,7 @@ static const char *g_wifi_password = MY_WIFI_PASSWORD;
 
 // ---------------------------------------------------
 // [DEBUG関連]
-#define QUE_SIZE_DEBUG_LOG    8
+#define QUE_SIZE_DEBUG_LOG    32
 static xTaskHandle s_xTaskDebugLog;
 static QueueHandle_t s_queue_handle_log = NULL;
 
@@ -62,28 +62,6 @@ typedef struct {
 
 // ---------------------------------------------------
 // [Static関数]
-
-static void DBG_LOG_PRINT(const char *p_msg, ...)
-{
-    log_msg_t log_msg;
-    va_list args;
-    uint16_t msg_len;
-
-    if (p_msg != NULL)
-    {
-        msg_len = strlen(p_msg) + 1;
-        log_msg.p_msg = (char *)ps_malloc(msg_len);
-
-        if(log_msg.p_msg != NULL)
-        {
-            va_start(args, p_msg);
-            vsnprintf(log_msg.p_msg, msg_len, p_msg, args);
-            va_end(args);
-
-            xQueueSend(s_queue_handle_log, &log_msg, 0);
-        }
-    }
-}
 
 #ifdef DEBUG_TASK
 static void _print_task_status(void)
@@ -239,6 +217,34 @@ static void vTaskDebugLog(void *p_param)
 
 // ---------------------------------------------------
 // [APP]
+
+void DBG_LOG_PRINT(const char *p_msg, ...)
+{
+    log_msg_t log_msg;
+    va_list args;
+    int msg_len;
+
+    if(p_msg != NULL)
+    {
+        va_start(args, p_msg);
+        msg_len = vsnprintf(NULL, 0, p_msg, args);
+        va_end(args);
+
+        if(msg_len >= 0)
+        {
+            log_msg.p_msg = (char *)ps_malloc(msg_len + 1);
+
+            if(log_msg.p_msg != NULL)
+            {
+                va_start(args, p_msg);
+                vsnprintf(log_msg.p_msg, msg_len + 1, p_msg, args);
+                va_end(args);
+
+                xQueueSend(s_queue_handle_log, &log_msg, 0);
+            }
+        }
+    }
+}
 
 void app_freertos_init(void)
 {

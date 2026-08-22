@@ -13,6 +13,8 @@
 
 #ifdef RGBLED_USE
 #include "app_neopixel.h"
+#define QUE_SIZE_RGBLED_DATA    8
+static QueueHandle_t s_queue_handle_rgbled_data = NULL;
 static led_color_t s_request_rgb_led_val = {.rgb = 0x000000};
 static led_color_t s_local_rgb_led_val = {.rgb = 0x000000};
 #endif
@@ -25,12 +27,22 @@ static const char *g_wifi_password = MY_WIFI_PASSWORD;
 
 // ---------------------------------------------------
 // [DEBUG関連]
+#define QUE_SIZE_DEBUG_LOG    8
+static QueueHandle_t s_queue_handle_log = NULL;
 static void _dbg_pcb_info_print(void);
-QueueHandle_t g_queue_handle_log = NULL;
 static void DBG_LOG_PRINT(QueueHandle_t queue_handle, const char *p_msg, ...);
 
 // ---------------------------------------------------
-// [グローバル]
+// [FreeRTOS関連]
+static xTaskHandle s_xTaskCore0;
+static xTaskHandle s_xTaskCore1;
+static xTaskHandle s_xTaskDebugLog;
+
+static void vTaskCore0(void *p_param);
+static void vTaskCore1(void *p_param);
+static void vTaskDebugLog(void *p_param);
+
+// ---------------------------------------------------
 typedef struct {
     char msg[128];
 } log_msg_t;
@@ -51,16 +63,6 @@ const char *p_esp_idf_ver_str = NULL;
 // ---------------------------------------------------
 // [Static]
 
-// FreeRTOS関連
-static xTaskHandle s_xTaskCore0;
-static xTaskHandle s_xTaskCore1;
-static xTaskHandle s_xTaskDebugLog;
-QueueHandle_t g_queue_handle_core2core = NULL;
-
-static void vTaskCore0(void *p_param);
-static void vTaskCore1(void *p_param);
-static void vTaskDebugLog(void *p_param);
-
 static void _freertos_init(void);
 static void _mcu_init(void);
 static void _pcb_init(void);
@@ -71,12 +73,19 @@ static void DBG_LOG_PRINT(QueueHandle_t queue_handle, const char *p_msg, ...)
 {
     log_msg_t log_msg;
     va_list args;
+    UBaseType_t que_space;
 
     va_start(args, p_msg);
     vsnprintf(log_msg.msg, sizeof(log_msg.msg), p_msg, args);
     va_end(args);
 
-    xQueueSend(queue_handle, &log_msg, 0);
+    que_space = uxQueueSpacesAvailable(queue_handle);
+    if(que_space > 0)
+    {
+        xQueueSend(queue_handle, &log_msg, 0);
+    } else {
+        Serial.printf("\33[31m [ERROR] Log Queue Full: %u\n\33[0m", que_space);
+    }
 }
 
 static void _mcu_init(void)
@@ -140,19 +149,19 @@ static void vTaskCore0(void *p_param)
     BaseType_t que_status;
     static uint8_t s_core_num = xPortGetCoreID();
 
-    DBG_LOG_PRINT(g_queue_handle_log, "[CPU Core %d] vTaskCore0\n", s_core_num);
+    DBG_LOG_PRINT(s_queue_handle_log, "[CPU Core %d] vTaskCore0\n", s_core_num);
 
     while (1)
     {
-        que_status = xQueueReceive(g_queue_handle_core2core,
+#ifdef RGBLED_USE
+        que_status = xQueueReceive(s_queue_handle_rgbled_data,
                                     &s_local_rgb_led_val,
                                     portMAX_DELAY);
 
         if(que_status == pdPASS)
         {
-#ifdef RGBLED_USE
             app_neopixel_set_rgb(0, &s_local_rgb_led_val);
-            DBG_LOG_PRINT(g_queue_handle_log,
+            DBG_LOG_PRINT(s_queue_handle_log,
                     "[CPU Core %d] RGB_LED: Set Color = (0x%02X, 0x%02X, 0x%02X)\n",
                     s_core_num,
                     s_local_rgb_led_val.para.red,
@@ -172,19 +181,19 @@ static void vTaskCore1(void *p_param)
     static uint8_t s_tbl_idx = 0;
     static uint8_t s_core_num = xPortGetCoreID();
 
-    DBG_LOG_PRINT(g_queue_handle_log, "[CPU Core %d] vTaskCore1\n", s_core_num);
+    DBG_LOG_PRINT(s_queue_handle_log, "[CPU Core %d] vTaskCore1\n", s_core_num);
 
     while (1)
     {
 #ifdef RGBLED_USE
-        que_status = xQueueSend(g_queue_handle_core2core,
+        que_status = xQueueSend(s_queue_handle_rgbled_data,
                                 &s_request_rgb_led_val,
                                 portMAX_DELAY);
 
         // キューの送信完了を受けて次のデータを用意しておく
         if(que_status == pdPASS)
         {
-            DBG_LOG_PRINT(g_queue_handle_log,
+            DBG_LOG_PRINT(s_queue_handle_log,
                     "[CPU Core %d] RGB_LED: Request Color = (0x%02X, 0x%02X, 0x%02X)\n",
                     s_core_num,
                     s_request_rgb_led_val.para.red,
@@ -207,7 +216,7 @@ static void vTaskDebugLog(void *p_param)
 
     while (1)
     {
-        que_status = xQueueReceive(g_queue_handle_log,
+        que_status = xQueueReceive(s_queue_handle_log,
                                     &log_msg,
                                     portMAX_DELAY);
 
@@ -216,17 +225,15 @@ static void vTaskDebugLog(void *p_param)
             Serial.printf("%s", log_msg.msg);
             memset(&log_msg.msg[0], 0x00, sizeof(log_msg.msg));
         }
-
-        vTaskDelay(20 / portTICK_PERIOD_MS);
     }
 }
 
 static void _freertos_init(void)
 {
     // キューの作成
-    g_queue_handle_log = xQueueCreate(8, sizeof(log_msg_t));
+    s_queue_handle_log = xQueueCreate(QUE_SIZE_DEBUG_LOG, sizeof(log_msg_t));
 #ifdef RGBLED_USE
-    g_queue_handle_core2core = xQueueCreate(8, sizeof(led_color_t));
+    s_queue_handle_rgbled_data = xQueueCreate(QUE_SIZE_RGBLED_DATA, sizeof(led_color_t));
 #endif
 
     // [デバッグ用のログをprintf()するだけのタスク @CPU Core 1]

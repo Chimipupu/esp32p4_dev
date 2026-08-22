@@ -36,6 +36,9 @@ static void _dbg_pcb_info_print(void);
 static void DBG_LOG_PRINT(QueueHandle_t queue_handle, const char *p_msg, ...);
 static void vTaskDebugLog(void *p_param);
 
+#ifdef DEBUG_TASK
+static void _print_task_status(void);
+#endif // DEBUG_TASK
 // ---------------------------------------------------
 // [FreeRTOS関連]
 #define QUE_SIZE_CORE_COM    8
@@ -73,10 +76,10 @@ uint8_t g_psram_size_mega_byte = 0;
 const char *p_esp_idf_ver_str = NULL;
 // ---------------------------------------------------
 // [Static]
-
 static void _freertos_init(void);
 static void _mcu_init(void);
 static void _pcb_init(void);
+
 // ---------------------------------------------------
 // [Static関数]
 
@@ -155,6 +158,27 @@ static void _pcb_init(void)
     _dbg_pcb_info_print();
 }
 
+#ifdef DEBUG_TASK
+static void _print_task_status(void)
+{
+    char *p_buf;
+
+    p_buf = (char *)malloc(1024);
+
+    if (p_buf != NULL)
+    {
+        Serial.printf("--- Task List ---\n");
+        vTaskList(p_buf);
+        Serial.printf("%s\n", p_buf);
+
+        Serial.printf("--- Run Time Stats ---\n");
+        vTaskGetRunTimeStats(p_buf);
+        Serial.printf("%s\n", p_buf);
+
+        free(p_buf);
+    }
+}
+#endif // DEBUG_TASK
 // ---------------------------------------------------
 // [FreeRTOSタスク(CPU Core0)]
 
@@ -261,7 +285,11 @@ static void vTaskCore1(void *p_param)
         }
 #endif
 
-        vTaskDelay(500 / portTICK_PERIOD_MS);
+#ifdef DEBUG_TASK
+        _print_task_status();
+#endif // DEBUG_TASK
+
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
 

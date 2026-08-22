@@ -15,10 +15,12 @@
 #include <stdarg.h>
 #include <math.h>
 
+#include "common.h"
+#include "pcb_def.h"
+
 // ---------------------------------------------------
 // [コンパイルスイッチ]
 // #define DEBUG_APP
-// #define DEBUG_TASK
 
 // ---------------------------------------------------
 void app_main_init(void);

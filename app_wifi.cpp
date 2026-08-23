@@ -4,7 +4,7 @@
  * @brief WiFiアプリ (for ESP32-P4)
  * @note ESP32-P4とSDIOで接続されてるESP32-C6専用の実装
  * @version 0.1
- * @date 2026-08-21
+ * @date 2026-08-23
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 

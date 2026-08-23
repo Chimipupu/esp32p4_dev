@@ -3,7 +3,7 @@
  * @author Chimipupu(https://github.com/Chimipupu)
  * @brief FreeRTOS
  * @version 0.1
- * @date 2026-08-21
+ * @date 2026-08-23
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 
@@ -11,6 +11,7 @@
 #include "app_main.h"
 #include "common.h"
 #include "pcb_def.h"
+#include "dbg_cmd.h"
 
 #ifdef RGBLED_USE
 #include "app_neopixel.h"
@@ -30,10 +31,32 @@ static const char *g_wifi_password = MY_WIFI_PASSWORD;
 // ---------------------------------------------------
 // [DEBUG関連]
 #define QUE_SIZE_DEBUG_LOG    32
-static xTaskHandle s_xTaskDebugLog;
+
+typedef struct {
+    char *p_msg;
+} log_msg_t;
+
 static QueueHandle_t s_queue_handle_log = NULL;
 
+static xTaskHandle s_xTaskDebugLog;
+static xTaskHandle s_xTaskDebugCmd;
+
+static E_DBG_CMD_RESULT _cmd_test(void *p_args);
+static const dbg_cmd_tbl_t s_ext_cmd_tbl[] = {
+    {"test", "ts", _cmd_test},
+};
+
+static uint8_t _serial_read_func(void);
+
+static const dbg_cmd_config_t s_dbg_cmd_config = {
+    .p_serial_read = _serial_read_func,
+    .p_serial_printf = DBG_LOG_PRINT,
+    .p_ext_cmd_tbl = (dbg_cmd_tbl_t *)s_ext_cmd_tbl,
+    .ext_cmd_num = sizeof(s_ext_cmd_tbl) / sizeof(s_ext_cmd_tbl[0]),
+};
+
 static void vTaskDebugLog(void *p_param);
+static void vTaskDebugCmd(void *p_param);
 
 #ifdef DEBUG_TASK
 static void _print_task_status(void);
@@ -56,12 +79,18 @@ static void vTaskCore0(void *p_param);
 static void vTaskCore1(void *p_param);
 
 // ---------------------------------------------------
-typedef struct {
-    char *p_msg;
-} log_msg_t;
-
-// ---------------------------------------------------
 // [Static関数]
+
+static uint8_t _serial_read_func(void)
+{
+    return (uint8_t)Serial.read();
+}
+
+static E_DBG_CMD_RESULT _cmd_test(void *p_args)
+{
+    DBG_LOG_PRINT("\33[31mTest Cmd Exec\r\n\33[0m");
+    return CMD_RESULT_EXEC_OK;
+}
 
 #ifdef DEBUG_TASK
 static void _print_task_status(void)
@@ -177,7 +206,7 @@ static void vTaskCore1(void *p_param)
         // キューの送信完了を受けて次のデータを用意しておく
         if(que_status == pdPASS)
         {
-#if 1
+#if 0
             DBG_LOG_PRINT("[vTaskCore1] RGB_LED: Request Color = (0x%02X, 0x%02X, 0x%02X)\n",
                             s_request_rgb_led_val.para.red,
                             s_request_rgb_led_val.para.green,
@@ -215,6 +244,17 @@ static void vTaskDebugLog(void *p_param)
     }
 }
 
+static void vTaskDebugCmd(void *p_param)
+{
+    dbg_cmd_init((dbg_cmd_config_t *) &s_dbg_cmd_config);
+
+    while (1)
+    {
+        dbg_cmd_poll();
+        dbg_cmd_main();
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+    }
+}
 // ---------------------------------------------------
 // [APP]
 
@@ -262,6 +302,16 @@ void app_freertos_init(void)
                             NULL,              // パラメータ
                             0,                 // 優先度(0～7、7が最優先)
                             &s_xTaskDebugLog,  // ハンドル
+                            APP_PROC_CORE      // CPUのコア選択
+                            );
+
+    // [デバッグ用のUARTコマンドを処理するタスク @CPU Core 1]
+    xTaskCreatePinnedToCore(vTaskDebugCmd,     // コールバック関数ポインタ
+                            "vTaskDebugCmd",   // タスク名
+                            4096,              // スタック
+                            NULL,              // パラメータ
+                            1,                 // 優先度(0～7、7が最優先)
+                            &s_xTaskDebugCmd,  // ハンドル
                             APP_PROC_CORE      // CPUのコア選択
                             );
 

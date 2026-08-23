@@ -183,21 +183,28 @@ void dbg_cmd_poll(void)
 {
     uint8_t tmp;
 
-    if(s_cmd_config.p_serial_read == NULL)
+    if(s_cmd_config.p_serial_read != NULL)
     {
-        return;
-    }
+        tmp = s_cmd_config.p_serial_read();
 
-    tmp = s_cmd_config.p_serial_read();
+        if ((tmp == KEY_BACK_SPACE) || (tmp == KEY_DEL))
+        {
+            s_rx_buf_idx--;
+        }
+        else
+        {
+            if ((tmp == '\r') || (tmp == '\n'))
+            {
+                s_is_rx_uart_cmd_flg = true;
+            }
 
-    if ((tmp == '\r') || (tmp == '\n')) {
-        s_is_rx_uart_cmd_flg = true;
-    }
-
-    // ASCII判定
-    if ((tmp >= 0x20) && (tmp <= 0x7E)) {
-        s_rx_buf[s_rx_buf_idx] = tmp;
-        s_rx_buf_idx = (s_rx_buf_idx + 1) % UART_RX_BUF_SIZE;
+            // ASCII判定
+            if ((tmp >= 0x20) && (tmp <= 0x7E))
+            {
+                s_rx_buf[s_rx_buf_idx] = tmp;
+                s_rx_buf_idx = (s_rx_buf_idx + 1) % UART_RX_BUF_SIZE;
+            }
+        }
     }
 }
 

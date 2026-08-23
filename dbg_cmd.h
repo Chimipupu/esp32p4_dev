@@ -15,6 +15,48 @@
 #include <string.h>
 
 // --------------------------------------------------------------------------
+#define KEY_BACK_SPACE      0x08
+#define KEY_DEL             0x7F
+
+// 文字色
+#define ASCII_TXT_RED       "\33[31m"
+#define ASCII_TXT_GREEN     "\33[32m"
+#define ASCII_TXT_YELLOW    "\33[33m"
+#define ASCII_TXT_BLUE      "\33[34m"
+#define ASCII_TXT_MAGENTA   "\33[35m"
+#define ASCII_TXT_CYAN      "\33[36m"
+#define ASCII_TXT_WHITE     "\33[37m"
+
+// 高輝度文字色
+#define ASCII_TXT_B_RED     "\33[91m"
+#define ASCII_TXT_B_GREEN   "\33[92m"
+#define ASCII_TXT_B_YELLOW  "\33[93m"
+#define ASCII_TXT_B_BLUE    "\33[94m"
+#define ASCII_TXT_B_MAGENTA "\33[95m"
+#define ASCII_TXT_B_CYAN    "\33[96m"
+#define ASCII_TXT_B_WHITE   "\33[97m"
+
+// 背景色
+#define ASCII_BG_BLACK      "\33[40m"
+#define ASCII_BG_RED        "\33[41m"
+#define ASCII_BG_GREEN      "\33[42m"
+#define ASCII_BG_YELLOW     "\33[43m"
+#define ASCII_BG_BLUE       "\33[44m"
+#define ASCII_BG_MAGENTA    "\33[45m"
+#define ASCII_BG_CYAN       "\33[46m"
+#define ASCII_BG_WHITE      "\33[47m"
+
+// 文字装飾 (Text Style)
+#define ASCII_STYLE_BOLD    "\33[1m"  // 太字
+#define ASCII_STYLE_UNDER   "\33[4m"  // 下線
+#define ASCII_STYLE_BLINK   "\33[5m"  // 点滅
+#define ASCII_STYLE_REVERSE "\33[7m"  // 反転
+
+// リセット
+#define ASCII_RESET         "\33[0m"  // すべての設定をクリア
+#define ANSI_ESC_CLEAR      "\33[2J\33[H" // 画面消去
+
+// --------------------------------------------------------------------------
 typedef enum {
     CMD_TYPE_BASIC = 0x00, // 基本コマンド
     CMD_TYPE_EXT,          // 拡張コマンド

@@ -189,7 +189,14 @@ void dbg_cmd_poll(void)
 
         if ((tmp == KEY_BACK_SPACE) || (tmp == KEY_DEL))
         {
-            s_rx_buf_idx--;
+            if(s_rx_buf_idx > 1)
+            {
+                s_rx_buf_idx--;
+            }
+            else
+            {
+                s_rx_buf_idx = 0;
+            }
         }
         else
         {

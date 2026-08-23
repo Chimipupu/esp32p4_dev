@@ -43,12 +43,12 @@ typedef struct {
 
 // シリアル Read/Write関数
 typedef uint8_t (*p_serial_read_func)(void);
-typedef void (*p_serial_printf_func)(const char *p_str, ...);
+typedef void (*p_printf_func)(const char *p_str, ...);
 
 // コマンド設定構造体
 typedef struct {
     p_serial_read_func p_serial_read;
-    p_serial_printf_func p_serial_printf;
+    p_printf_func p_printf;
     dbg_cmd_tbl_t *p_ext_cmd_tbl;         // 拡張コマンドのテーブルポインタ
     uint8_t ext_cmd_num;                  // 拡張コマンド数
 } dbg_cmd_config_t;

@@ -50,7 +50,7 @@ static uint8_t _serial_read_func(void);
 
 static const dbg_cmd_config_t s_dbg_cmd_config = {
     .p_serial_read = _serial_read_func,
-    .p_serial_printf = DBG_LOG_PRINT,
+    .p_printf = DBG_LOG_PRINT,
     .p_ext_cmd_tbl = (dbg_cmd_tbl_t *)s_ext_cmd_tbl,
     .ext_cmd_num = sizeof(s_ext_cmd_tbl) / sizeof(s_ext_cmd_tbl[0]),
 };

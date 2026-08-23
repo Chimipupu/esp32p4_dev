@@ -56,7 +56,7 @@ static bool _cmd_ready(uint8_t *p_cmd_buf)
     p_ptr = p_cmd_buf;
     p_tbl = ps_cmd_tbl;
 
-    if(s_cmd_config.p_serial_printf == NULL)
+    if(s_cmd_config.p_printf == NULL)
     {
         return false;
     }
@@ -109,14 +109,14 @@ static bool _cmd_ready(uint8_t *p_cmd_buf)
     {
         case CMD_TYPE_BASIC:
         case CMD_TYPE_EXT:
-            s_cmd_config.p_serial_printf("\33[32mCmd: %s\r\n\33[0m", p_cmd_buf);
+            s_cmd_config.p_printf("\33[32mCmd: %s\r\n\33[0m", p_cmd_buf);
             s_rx_cmd_no = i;
             is_ret = true;
             break;
 
         case CMD_TYPE_NONE:
         default:
-            s_cmd_config.p_serial_printf("?\r\n");
+            s_cmd_config.p_printf("?\r\n");
             ps_exec_cmd_func = NULL;
             break;
     }
@@ -133,46 +133,46 @@ static E_DBG_CMD_RESULT _cmd_help(void *p_args)
 {
     uint8_t i;
 
-    if(s_cmd_config.p_serial_printf == NULL)
+    if(s_cmd_config.p_printf == NULL)
     {
         return CMD_RESULT_EXEC_ERROR;
     }
 
 
-    s_cmd_config.p_serial_printf("Help Cmd Exec\r\n");
-    s_cmd_config.p_serial_printf("--------------------------------\r\n");
-    s_cmd_config.p_serial_printf("Basic Commands\r\n");
-    s_cmd_config.p_serial_printf("No, Cmd, Short Cmd\r\n");
+    s_cmd_config.p_printf("Help Cmd Exec\r\n");
+    s_cmd_config.p_printf("--------------------------------\r\n");
+    s_cmd_config.p_printf("Basic Commands\r\n");
+    s_cmd_config.p_printf("No, Cmd, Short Cmd\r\n");
 
     for(i = 0; i < BASIC_CMD_NUM; i++)
     {
-        s_cmd_config.p_serial_printf("%d, %s, %s\r\n", i, s_basic_cmd_tbl[i].p_cmd_str, s_basic_cmd_tbl[i].p_cmd_str_short);
+        s_cmd_config.p_printf("\33[32m%d, %s, %s\r\n\33[0m", i, s_basic_cmd_tbl[i].p_cmd_str, s_basic_cmd_tbl[i].p_cmd_str_short);
     }
 
     if(s_cmd_config.p_ext_cmd_tbl != NULL) {
-        s_cmd_config.p_serial_printf("--------------------------------\r\n");
-        s_cmd_config.p_serial_printf("Extend Commands\r\n");
-        s_cmd_config.p_serial_printf("No, Cmd, Short Cmd\r\n");
+        s_cmd_config.p_printf("--------------------------------\r\n");
+        s_cmd_config.p_printf("Extend Commands\r\n");
+        s_cmd_config.p_printf("No, Cmd, Short Cmd\r\n");
 
         for(i = 0; i < s_cmd_config.ext_cmd_num; i++)
         {
-            s_cmd_config.p_serial_printf("%d, %s, %s\r\n", i, s_cmd_config.p_ext_cmd_tbl[i].p_cmd_str, s_cmd_config.p_ext_cmd_tbl[i].p_cmd_str_short);
+            s_cmd_config.p_printf("\33[32m%d, %s, %s\r\n\33[0m", i, s_cmd_config.p_ext_cmd_tbl[i].p_cmd_str, s_cmd_config.p_ext_cmd_tbl[i].p_cmd_str_short);
         }
     }
 
-    s_cmd_config.p_serial_printf("--------------------------------\r\n");
+    s_cmd_config.p_printf("--------------------------------\r\n");
 
     return CMD_RESULT_EXEC_OK;
 }
 
 static E_DBG_CMD_RESULT _cmd_clear(void *p_args)
 {
-    if(s_cmd_config.p_serial_printf == NULL)
+    if(s_cmd_config.p_printf == NULL)
     {
         return CMD_RESULT_EXEC_ERROR;
     }
 
-    s_cmd_config.p_serial_printf("\33[2J\33[H");
+    s_cmd_config.p_printf("\33[2J\33[H");
 
     return CMD_RESULT_EXEC_OK;
 }
@@ -209,7 +209,7 @@ void dbg_cmd_init(dbg_cmd_config_t *p_cmd_config)
         return;
     }
 
-    if((p_cmd_config->p_serial_read == NULL) || (p_cmd_config->p_serial_printf == NULL))
+    if((p_cmd_config->p_serial_read == NULL) || (p_cmd_config->p_printf == NULL))
     {
         return;
     }

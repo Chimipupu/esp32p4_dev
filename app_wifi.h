@@ -4,7 +4,7 @@
  * @brief WiFiアプリ (for ESP32-P4)
  * @note ESP32-P4とSDIOで接続されてるESP32-C6専用の実装
  * @version 0.1
- * @date 2026-08-23
+ * @date 2026-11-08
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 
@@ -32,6 +32,8 @@
 // -----------------------------------------------------------
 extern xTaskHandle g_xTaskWiFi;
 void vTaskWiFi(void *p_param);
+void app_wifi_ntp_sync(void);
+void app_wifi_get_rssi_and_ipaddr(void);
 #endif
 
 #endif // APP_WIFI_H

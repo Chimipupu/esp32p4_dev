@@ -3,7 +3,7 @@
  * @author Chimipupu(https://github.com/Chimipupu)
  * @brief アプリメイン
  * @version 0.1
- * @date 2026-08-23
+ * @date 2026-11-08
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 
@@ -16,7 +16,6 @@
 
 // ---------------------------------------------------
 // [DEBUG関連]
-static void _dbg_pcb_info_print(void);
 
 // ---------------------------------------------------
 #if (PCB_TYPE == JS_ESP32P4_M3_DEV)
@@ -74,7 +73,17 @@ static void _mcu_init(void)
     p_esp_idf_ver_str = (char *)esp_get_idf_version();
 }
 
-static void _dbg_pcb_info_print(void)
+static void _pcb_init(void)
+{
+    pcb_info();
+}
+// ---------------------------------------------------
+// [API]
+
+/**
+ * @brief 基板情報表示関数
+ */
+void pcb_info(void)
 {
     Serial.printf("-------------------------------\n");
     Serial.printf("PCB: %s\n", p_pcb_name_str);
@@ -91,13 +100,6 @@ static void _dbg_pcb_info_print(void)
     Serial.printf("ESP-IDF Version: %s\n", p_esp_idf_ver_str);
     Serial.printf("-------------------------------\n");
 }
-
-static void _pcb_init(void)
-{
-    _dbg_pcb_info_print();
-}
-// ---------------------------------------------------
-// [API]
 
 /**
  * @brief アプリメイン初期化

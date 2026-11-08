@@ -3,7 +3,7 @@
  * @author Chimipupu(https://github.com/Chimipupu)
  * @brief FreeRTOS
  * @version 0.1
- * @date 2026-08-23
+ * @date 2026-11-08
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 
@@ -24,6 +24,7 @@ static void vTaskRgbLed(void *p_param);
 
 #ifdef WIFI_USE
 #include "app_wifi.h"
+static E_DBG_CMD_RESULT _cmd_ntp(void *p_args);
 static const char *g_wifi_ssid = MY_WIFI_SSID;
 static const char *g_wifi_password = MY_WIFI_PASSWORD;
 #endif
@@ -44,6 +45,9 @@ static xTaskHandle s_xTaskDebugCmd;
 static E_DBG_CMD_RESULT _cmd_test(void *p_args);
 static const dbg_cmd_tbl_t s_ext_cmd_tbl[] = {
     {"test", "ts", _cmd_test},
+#ifdef WIFI_USE
+    {"ntp", "np", _cmd_ntp},
+#endif
 };
 
 static uint8_t _serial_read_func(void);
@@ -88,9 +92,21 @@ static uint8_t _serial_read_func(void)
 
 static E_DBG_CMD_RESULT _cmd_test(void *p_args)
 {
-    DBG_LOG_PRINT("\33[31mTest Cmd Exec\r\n\33[0m");
+    pcb_info();
+
     return CMD_RESULT_EXEC_OK;
 }
+
+#ifdef WIFI_USE
+static E_DBG_CMD_RESULT _cmd_ntp(void *p_args)
+{
+    app_wifi_get_rssi_and_ipaddr();
+
+    app_wifi_ntp_sync();
+
+    return CMD_RESULT_EXEC_OK;
+}
+#endif
 
 #ifdef DEBUG_TASK
 static void _print_task_status(void)
@@ -148,6 +164,7 @@ static void vTaskCore0(void *p_param)
 
     while (1)
     {
+#ifdef RGBLED_USE
         que_status = xQueueReceive(s_queue_handle_core_com,
                                     &s_local_rgb_led_val,
                                     portMAX_DELAY);
@@ -156,6 +173,8 @@ static void vTaskCore0(void *p_param)
         {
             // TODO
         }
+#endif
+        vTaskDelay(500 / portTICK_PERIOD_MS);
     }
 }
 

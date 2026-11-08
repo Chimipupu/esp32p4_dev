@@ -4,7 +4,7 @@
  * @brief WiFiアプリ (for ESP32-P4)
  * @note ESP32-P4とSDIOで接続されてるESP32-C6専用の実装
  * @version 0.1
- * @date 2026-08-23
+ * @date 2026-11-08
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 
@@ -47,9 +47,9 @@ static void _wifi_event_handler(WiFiEvent_t event, WiFiEventInfo_t info);
 static void _wifi_coprocessor_reset(void);
 static void _wifi_connet(const char *p_ssid, const char *p_password);
 // static void _wifi_disconnet(void);
-static bool _get_ntp_and_rtc_time(void);
-void _wifi_init(const char *p_ssid, const char *p_password);
-void _wifi_main(void);
+static void _get_ntp_and_rtc_time(void);
+static void _wifi_init(const char *p_ssid, const char *p_password);
+static void _wifi_main(void);
 // -----------------------------------------------------------
 // [Static]
 
@@ -153,8 +153,8 @@ WIFI_RETRY:
 #endif
 
     Serial.printf("\r\nWiFi Connect, Succes!\r\n");
-    Serial.printf("RSSI: %d\r\n", WiFi.RSSI());
-    Serial.printf("IP Addr: %s\r\n", WiFi.localIP().toString().c_str());
+    // RSSIとIPアドレスをprintf()
+    app_wifi_get_rssi_and_ipaddr();
 }
 
 #if 0
@@ -167,7 +167,7 @@ static void _wifi_disconnet(void)
 }
 #endif
 
-static bool _get_ntp_and_rtc_time(void)
+static void _get_ntp_and_rtc_time(void)
 {
     struct tm utc_tm;
     struct tm jst_tm;
@@ -180,33 +180,35 @@ static bool _get_ntp_and_rtc_time(void)
 
         // NTPと時刻同期が未完了なので終了
         if(sp_utc_tm->tm_year <= 70) {
-            return s_is_ntp_sync;
+            return;
         }
 
         // UTCからJSTに変換
         sp_jst_tm = localtime_r(&s_utc_time, &jst_tm);
+        s_utc_time = time(nullptr);
+        sp_utc_tm = gmtime_r(&s_utc_time, &utc_tm);
+        sp_jst_tm = localtime_r(&s_utc_time, &jst_tm);
+
+        Serial.printf("JST: %04d/%02d/%02d %02d:%02d:%02d\r\n",
+            sp_jst_tm->tm_year + 1900, sp_jst_tm->tm_mon + 1, sp_jst_tm->tm_mday,
+            sp_jst_tm->tm_hour, sp_jst_tm->tm_min, sp_jst_tm->tm_sec);
 
         // NTPと時刻同期したのでフラグを立てとく
         s_is_ntp_sync = true;
-        Serial.printf("NTP time Sync RTC Succes!\r\n");
+        // Serial.printf("NTP time Sync RTC Succes!\r\n");
 
         // WiFi切断
         // _wifi_disconnet();
     }
-
-    return s_is_ntp_sync;
 }
 
-void _wifi_init(const char *p_ssid, const char *p_password)
+static void _wifi_init(const char *p_ssid, const char *p_password)
 {
     _wifi_connet(p_ssid, p_password);
 }
 
-void _wifi_main(void)
+static void _wifi_main(void)
 {
-    struct tm utc_tm;
-    struct tm jst_tm;
-
     // WiFi未接続時は何も処理しない
     if(s_is_wifi_connect == false) {
         return;
@@ -218,16 +220,37 @@ void _wifi_main(void)
     }
 
     // NTPと時刻同期
-    if(s_is_ntp_sync == false) {
-        _get_ntp_and_rtc_time();
-    } else {
-        s_utc_time = time(nullptr);
-        sp_utc_tm = gmtime_r(&s_utc_time, &utc_tm);
-        sp_jst_tm = localtime_r(&s_utc_time, &jst_tm);
+    _get_ntp_and_rtc_time();
+}
 
-        Serial.printf("JST Time: %04d/%02d/%02d %02d:%02d:%02d\r\n",
-            sp_jst_tm->tm_year + 1900, sp_jst_tm->tm_mon + 1, sp_jst_tm->tm_mday,
-            sp_jst_tm->tm_hour, sp_jst_tm->tm_min, sp_jst_tm->tm_sec);
+// -----------------------------------------------------------
+// [API]
+
+// RSSIとIPアドレスをprintf()
+void app_wifi_get_rssi_and_ipaddr(void)
+{
+    if(s_is_wifi_connect == false) {
+        return;
+    }
+
+    Serial.printf("RSSI: %d\r\n", WiFi.RSSI());
+    Serial.printf("IP Addr: %s\r\n", WiFi.localIP().toString().c_str());
+}
+
+// NTPと同期してJSTの時刻をprintf()
+void app_wifi_ntp_sync(void)
+{
+    if(s_is_wifi_connect == false) {
+        return;
+    }
+
+    if(s_is_ntp_sync == true) {
+        s_is_ntp_sync = false;
+    }
+
+    while(s_is_ntp_sync == false)
+    {
+        _get_ntp_and_rtc_time();
     }
 }
 
@@ -245,7 +268,7 @@ void vTaskWiFiInit(void *p_param)
     xTaskNotifyGive(g_xTaskWiFi);
 
     // タスク終了
-    Serial.printf("[DEBUG] vTaskWiFiInit: WiFI Connected!! Task Kill! Good Bye!\n");
+    // Serial.printf("[DEBUG] vTaskWiFiInit: WiFI Connected!! Task Kill! Good Bye!\n");
     vTaskDelete(NULL);
 }
 

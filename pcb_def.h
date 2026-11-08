@@ -3,7 +3,7 @@
  * @author Chimipupu(https://github.com/Chimipupu)
  * @brief 基板別定義
  * @version 0.1
- * @date 2026-08-23
+ * @date 2026-11-08
  * @copyright Copyright (c) 2026 Chimipupu All Rights Reserved.
  */
 
@@ -14,8 +14,8 @@
 #define WT9932P4_TINY        0x00
 #define JS_ESP32P4_M3_DEV    0x01
 
-#define PCB_TYPE             WT9932P4_TINY
-// #define PCB_TYPE             JS_ESP32P4_M3_DEV
+// #define PCB_TYPE             WT9932P4_TINY
+#define PCB_TYPE             JS_ESP32P4_M3_DEV
 
 /**
  * @brief WT9932P4_TINY
@@ -41,6 +41,7 @@
 #define WIFI_BLUETOOTH_COPROCESSOR_ESP32C6
 #endif // (PCB_TYPE == JS_ESP32P4_M3_DEV)
 
+void pcb_info(void);
 // ---------------------------------------------------
 
 #endif // PCB_DEF_H
